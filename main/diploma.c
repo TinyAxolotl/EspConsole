@@ -7,10 +7,15 @@
 #include "esp_psram.h"
 #include "esp_wifi.h"
 
+#include "esp32s3/rom/gpio.h"
+
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "driver/gpio.h"
+#include "soc/gpio_struct.h"
 #include "esp_rom_sys.h"
+
+#include "soc/gpio_sig_map.h"
 
 #include "lvgl.h"
 
@@ -25,11 +30,17 @@
 #define LCD_CS    37
 #define LCD_RST   38
 
+#define I2S_MCLK_PIN   45
+#define I2S_BCLK_PIN   46
+#define I2S_WS_PIN     27
+#define I2S_DOUT_PIN   33
+
+#define LCD_DATA_BUS_MASK (0xFFFF << 4)
+
 void lcd_set_data_bus(uint16_t data)
 {
-    for (int i = 0; i < 16; i++) {
-        gpio_set_level(LCD_DB0 + i, (data >> i) & 0x01);
-    }
+    GPIO.out_w1tc = LCD_DATA_BUS_MASK;
+    GPIO.out_w1ts = ((uint32_t)data << 4) & LCD_DATA_BUS_MASK;
 }
 
 void ili9481_send_command(uint8_t cmd)
@@ -57,6 +68,14 @@ void ili9481_send_data(uint16_t data)
     esp_rom_delay_us(1);
     gpio_set_level(LCD_WR, 1);
     gpio_set_level(LCD_CS, 1);
+}
+
+void ili9481_send_s_data(uint16_t data)
+{
+    lcd_set_data_bus(data);
+    gpio_set_level(LCD_WR, 0);
+    esp_rom_delay_us(1);
+    gpio_set_level(LCD_WR, 1);
 }
 
 void ili9481_init(void)
@@ -123,11 +142,15 @@ void ili9481_draw_filled_rect(uint16_t x, uint16_t y, uint16_t width, uint16_t h
     
     // Write to display memory cmd
     ili9481_send_command(0x2C);
-    
+    ili9481_send_data(color);
+
+    ili9481_send_command(0x3C);
+    gpio_set_level(LCD_CS, 0);
+    gpio_set_level(LCD_RS, 1);
     // Fill everything with color
     uint32_t total_pixels = width * height;
     for (uint32_t i = 0; i < total_pixels; i++) {
-        ili9481_send_data(color);
+        ili9481_send_s_data(color);
     }
 }
 
@@ -152,25 +175,30 @@ int disable_wireless_peripherials()
 
 void my_flush_cb(lv_display_t *disp, const lv_area_t *area, uint8_t *px_map) {
     ili9481_send_command(0x2A);
-    ili9481_send_data(area->x1 >> 8);
+    ili9481_send_data((area->x1 >> 8) & 0xFF);
     ili9481_send_data(area->x1 & 0xFF);
-    ili9481_send_data(area->x2 >> 8);
+    ili9481_send_data((area->x2 >> 8) & 0xFF);
     ili9481_send_data(area->x2 & 0xFF);
 
     ili9481_send_command(0x2B);
-    ili9481_send_data(area->y1 >> 8);
+    ili9481_send_data((area->y1 >> 8) & 0xFF);
     ili9481_send_data(area->y1 & 0xFF);
-    ili9481_send_data(area->y2 >> 8);
+    ili9481_send_data((area->y2 >> 8) & 0xFF);
     ili9481_send_data(area->y2 & 0xFF);
 
-    ili9481_send_command(0x2C);  // команда записи в GRAM
+    ili9481_send_command(0x2C);
+    ili9481_send_command(0x3C);
+    gpio_set_level(LCD_CS, 0);
+    gpio_set_level(LCD_RS, 1);
 
     const uint16_t *color_p = (const uint16_t *)px_map;
     uint32_t pixels = (area->x2 - area->x1 + 1) * (area->y2 - area->y1 + 1);
     for (uint32_t i = 0; i < pixels; i++) {
-        ili9481_send_data(color_p[i]);
+        ili9481_send_s_data(color_p[i]);
     }
+
     lv_display_flush_ready(disp);
+    printf("CB called and processed!\n");
 }
 
 void tick_inc(void *pvParameters) {
@@ -226,7 +254,8 @@ void app_main(void)
     
     // Display init
     ili9481_init();
-    
+    ili9481_draw_filled_rect(0, 0, DISP_WIDTH, DISP_HEIGHT, 0xF800);
+
     // Draw black rectangle 100x100 px in pos x50, y50
     //ili9481_draw_filled_rect(50, 50, 100, 100, 0x0000);
     lv_init();

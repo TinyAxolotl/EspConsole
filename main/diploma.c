@@ -12,6 +12,11 @@
 #include "driver/gpio.h"
 #include "esp_rom_sys.h"
 
+#include "lvgl.h"
+
+#define DISP_WIDTH   320
+#define DISP_HEIGHT  480
+
 #define LCD_DB0   4
 #define LCD_DB15  19
 
@@ -88,6 +93,11 @@ void ili9481_init(void)
     ili9481_send_data(0x01);       // Final row high byte (479 >> 8)
     ili9481_send_data(0xDF);       // Final row low byte (479 = 0x1DF)
     
+    ili9481_send_command(0x20);    // Exit invert mode
+
+    ili9481_send_command(0x36);
+    ili9481_send_data(0b00000010); // set orientation. TODO: Debug it. Investigate available orientation options.
+
     // Enable display
     ili9481_send_command(0x29);
     vTaskDelay(pdMS_TO_TICKS(50));
@@ -140,6 +150,36 @@ int disable_wireless_peripherials()
 	return ESP_OK;
 }
 
+void my_flush_cb(lv_display_t *disp, const lv_area_t *area, uint8_t *px_map) {
+    ili9481_send_command(0x2A);
+    ili9481_send_data(area->x1 >> 8);
+    ili9481_send_data(area->x1 & 0xFF);
+    ili9481_send_data(area->x2 >> 8);
+    ili9481_send_data(area->x2 & 0xFF);
+
+    ili9481_send_command(0x2B);
+    ili9481_send_data(area->y1 >> 8);
+    ili9481_send_data(area->y1 & 0xFF);
+    ili9481_send_data(area->y2 >> 8);
+    ili9481_send_data(area->y2 & 0xFF);
+
+    ili9481_send_command(0x2C);  // команда записи в GRAM
+
+    const uint16_t *color_p = (const uint16_t *)px_map;
+    uint32_t pixels = (area->x2 - area->x1 + 1) * (area->y2 - area->y1 + 1);
+    for (uint32_t i = 0; i < pixels; i++) {
+        ili9481_send_data(color_p[i]);
+    }
+    lv_display_flush_ready(disp);
+}
+
+void tick_inc(void *pvParameters) {
+    while (1) {
+        vTaskDelay(pdMS_TO_TICKS(10));
+        lv_tick_inc(10);
+    }
+}
+
 void app_main(void)
 {
 	disable_wireless_peripherials(); // Wifi && BT is not needed here..
@@ -188,16 +228,33 @@ void app_main(void)
     ili9481_init();
     
     // Draw black rectangle 100x100 px in pos x50, y50
-    ili9481_draw_filled_rect(50, 50, 100, 100, 0x0000);
-    
+    //ili9481_draw_filled_rect(50, 50, 100, 100, 0x0000);
+    lv_init();
+
+    static lv_color_t buf_1[DISP_WIDTH * 10];
+    static lv_color_t buf_2[DISP_WIDTH * 10];
+    printf("Ololo\n");
+    lv_display_t * disp = lv_display_create(DISP_WIDTH, DISP_HEIGHT); /* Basic initialization with horizontal and vertical resolution in pixels */
+    lv_display_set_flush_cb(disp, my_flush_cb); /* Set a flush callback to draw to the display */
+    lv_display_set_buffers(disp, buf_1, buf_2, sizeof(buf_1), LV_DISPLAY_RENDER_MODE_PARTIAL); /* Set an initialized buffer */
+
+    /* Change Active Screen's background color */
+    lv_obj_set_style_bg_color(lv_screen_active(), lv_color_hex(0x00FF00), LV_PART_MAIN);
+    lv_obj_set_style_text_color(lv_screen_active(), lv_color_hex(0xffffff), LV_PART_MAIN);
+
+    /* Create a spinner */
+    lv_obj_t * spinner = lv_spinner_create(lv_screen_active());
+
+    lv_spinner_set_anim_params(spinner, 1000, 60);
+
+    lv_obj_set_size(spinner, 128, 128);
+
+    lv_obj_align(spinner, LV_ALIGN_CENTER, 0, 0);
+
+    xTaskCreate(tick_inc, "TickInc", 2048, NULL, 1, NULL);
+    uint32_t nextRun = 0;
     while (1) {
-        vTaskDelay(pdMS_TO_TICKS(1000));
-        ili9481_draw_filled_rect(100, 100, 200, 200, 0xAEAE);
-        vTaskDelay(pdMS_TO_TICKS(1000));
-        ili9481_draw_filled_rect(100, 100, 200, 200, 0xFFFF);
-        vTaskDelay(pdMS_TO_TICKS(1000));
-        ili9481_draw_filled_rect(100, 100, 200, 200, 0x0000);
-        vTaskDelay(pdMS_TO_TICKS(1000));
-        ili9481_draw_filled_rect(100, 100, 200, 200, 0xFFFF);
+        vTaskDelay(pdMS_TO_TICKS(nextRun));
+        nextRun = lv_timer_handler();
     }
 }

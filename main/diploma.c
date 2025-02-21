@@ -15,25 +15,40 @@
 #include "soc/gpio_struct.h"
 #include "esp_rom_sys.h"
 
-#include "soc/gpio_sig_map.h"
+#include "esp_err.h"
+#include "esp_log.h"
+#include "esp_lcd_panel_io.h"
+#include "esp_lcd_panel_vendor.h"
+#include "esp_lcd_panel_ops.h"
 
 #include "lvgl.h"
+
+#define TAG         "DIPLOM"
 
 #define DISP_WIDTH   320
 #define DISP_HEIGHT  480
 
 #define LCD_DB0   4
+#define LCD_DB1   5
+#define LCD_DB2   6
+#define LCD_DB3   7
+#define LCD_DB4   8
+#define LCD_DB5   9
+#define LCD_DB6   10
+#define LCD_DB7   11
+#define LCD_DB8   12
+#define LCD_DB9   13
+#define LCD_DB10  14
+#define LCD_DB11  15
+#define LCD_DB12  16
+#define LCD_DB13  17
+#define LCD_DB14  18
 #define LCD_DB15  19
 
 #define LCD_RS    35
 #define LCD_WR    36
 #define LCD_CS    37
 #define LCD_RST   38
-
-#define I2S_MCLK_PIN   45
-#define I2S_BCLK_PIN   46
-#define I2S_WS_PIN     27
-#define I2S_DOUT_PIN   33
 
 #define LCD_DATA_BUS_MASK (0xFFFF << 4)
 
@@ -173,7 +188,14 @@ int disable_wireless_peripherials()
 	return ESP_OK;
 }
 
-void my_flush_cb(lv_display_t *disp, const lv_area_t *area, uint8_t *px_map) {
+void my_flush_cb(lv_display_t *disp, const lv_area_t *area, uint8_t *color_map) {
+
+    esp_lcd_panel_handle_t panel_handle = lv_display_get_user_data(disp);
+    int offsetx1 = area->x1;
+    int offsetx2 = area->x2;
+    int offsety1 = area->y1;
+    int offsety2 = area->y2;
+
     ili9481_send_command(0x2A);
     ili9481_send_data((area->x1 >> 8) & 0xFF);
     ili9481_send_data(area->x1 & 0xFF);
@@ -191,11 +213,7 @@ void my_flush_cb(lv_display_t *disp, const lv_area_t *area, uint8_t *px_map) {
     gpio_set_level(LCD_CS, 0);
     gpio_set_level(LCD_RS, 1);
 
-    const uint16_t *color_p = (const uint16_t *)px_map;
-    uint32_t pixels = (area->x2 - area->x1 + 1) * (area->y2 - area->y1 + 1);
-    for (uint32_t i = 0; i < pixels; i++) {
-        ili9481_send_s_data(color_p[i]);
-    }
+    esp_lcd_panel_draw_bitmap(panel_handle, offsetx1, offsety1, offsetx2 + 1, offsety2 + 1, color_map);
 
     lv_display_flush_ready(disp);
     printf("CB called and processed!\n");
@@ -206,6 +224,124 @@ void tick_inc(void *pvParameters) {
         vTaskDelay(pdMS_TO_TICKS(10));
         lv_tick_inc(10);
     }
+}
+
+void example_init_i80_bus(esp_lcd_panel_io_handle_t *io_handle)
+{
+    ESP_LOGI(TAG, "Initialize Intel 8080 bus");
+    esp_lcd_i80_bus_handle_t i80_bus = NULL;
+    esp_lcd_i80_bus_config_t bus_config = {
+        .clk_src = LCD_CLK_SRC_DEFAULT,
+        .dc_gpio_num = LCD_RS,
+        .wr_gpio_num = LCD_WR,
+        .data_gpio_nums = {
+            LCD_DB0,
+            LCD_DB1,
+            LCD_DB2,
+            LCD_DB3,
+            LCD_DB4,
+            LCD_DB5,
+            LCD_DB6,
+            LCD_DB7,
+            LCD_DB8,
+            LCD_DB9,
+            LCD_DB10,
+            LCD_DB11,
+            LCD_DB12,
+            LCD_DB13,
+            LCD_DB14,
+            LCD_DB15
+        },
+        .bus_width = 16,
+        .max_transfer_bytes = 320 * 480 * sizeof(uint16_t),
+        .dma_burst_size = 64,
+    };
+    ESP_ERROR_CHECK(esp_lcd_new_i80_bus(&bus_config, &i80_bus));
+
+    esp_lcd_panel_io_i80_config_t io_config = {
+        .cs_gpio_num = LCD_CS,
+        .pclk_hz = 10000000,
+        .trans_queue_depth = 10,
+        .dc_levels = {
+            .dc_idle_level = 0,
+            .dc_cmd_level = 0,
+            .dc_dummy_level = 0,
+            .dc_data_level = 1,
+        },
+        .lcd_cmd_bits = 8,
+        .lcd_param_bits = 16,
+    };
+    ESP_ERROR_CHECK(esp_lcd_new_panel_io_i80(i80_bus, &io_config, io_handle));
+}
+
+void example_init_lcd_panel(esp_lcd_panel_io_handle_t io_handle, esp_lcd_panel_handle_t *panel)
+{
+    esp_lcd_panel_handle_t panel_handle = NULL;
+#if CONFIG_EXAMPLE_LCD_I80_CONTROLLER_ST7789
+    ESP_LOGI(TAG, "Install LCD driver of st7789");
+    esp_lcd_panel_dev_config_t panel_config = {
+        .reset_gpio_num = EXAMPLE_PIN_NUM_RST,
+        .rgb_ele_order = LCD_RGB_ELEMENT_ORDER_RGB,
+        .bits_per_pixel = 16,
+    };
+    ESP_ERROR_CHECK(esp_lcd_new_panel_st7789(io_handle, &panel_config, &panel_handle));
+
+    esp_lcd_panel_reset(panel_handle);
+    esp_lcd_panel_init(panel_handle);
+    // Set inversion, x/y coordinate order, x/y mirror according to your LCD module spec
+    // the gap is LCD panel specific, even panels with the same driver IC, can have different gap value
+    esp_lcd_panel_invert_color(panel_handle, true);
+    esp_lcd_panel_set_gap(panel_handle, 0, 20);
+#elif CONFIG_EXAMPLE_LCD_I80_CONTROLLER_NT35510
+    ESP_LOGI(TAG, "Install LCD driver of nt35510");
+    esp_lcd_panel_dev_config_t panel_config = {
+        .reset_gpio_num = EXAMPLE_PIN_NUM_RST,
+        .rgb_ele_order = LCD_RGB_ELEMENT_ORDER_BGR,
+        .bits_per_pixel = 16,
+    };
+    ESP_ERROR_CHECK(esp_lcd_new_panel_nt35510(io_handle, &panel_config, &panel_handle));
+
+    esp_lcd_panel_reset(panel_handle);
+    esp_lcd_panel_init(panel_handle);
+    // Set inversion, x/y coordinate order, x/y mirror according to your LCD module spec
+    // the gap is LCD panel specific, even panels with the same driver IC, can have different gap value
+    esp_lcd_panel_swap_xy(panel_handle, true);
+    esp_lcd_panel_mirror(panel_handle, true, false);
+#elif CONFIG_EXAMPLE_LCD_I80_CONTROLLER_ILI9341
+    // ILI9341 is NOT a distinct driver, but a special case of ST7789
+    // (essential registers are identical). A few lines further down in this code,
+    // it's shown how to issue additional device-specific commands.
+    ESP_LOGI(TAG, "Install LCD driver of ili9341 (st7789 compatible)");
+    esp_lcd_panel_dev_config_t panel_config = {
+        .reset_gpio_num = EXAMPLE_PIN_NUM_RST,
+        .rgb_ele_order = LCD_RGB_ELEMENT_ORDER_BGR,
+        .bits_per_pixel = 16,
+    };
+    ESP_ERROR_CHECK(esp_lcd_new_panel_st7789(io_handle, &panel_config, &panel_handle));
+
+    esp_lcd_panel_reset(panel_handle);
+    esp_lcd_panel_init(panel_handle);
+    // Set inversion, x/y coordinate order, x/y mirror according to your LCD module spec
+    // the gap is LCD panel specific, even panels with the same driver IC, can have different gap value
+    esp_lcd_panel_swap_xy(panel_handle, true);
+    esp_lcd_panel_invert_color(panel_handle, false);
+    // ILI9341 is very similar to ST7789 and shares the same driver.
+    // Anything unconventional (such as this custom gamma table) can
+    // be issued here in user code and need not modify the driver.
+    esp_lcd_panel_io_tx_param(io_handle, 0xF2, (uint8_t[]) {
+        0
+    }, 1); // 3Gamma function disable
+    esp_lcd_panel_io_tx_param(io_handle, 0x26, (uint8_t[]) {
+        1
+    }, 1); // Gamma curve 1 selected
+    esp_lcd_panel_io_tx_param(io_handle, 0xE0, (uint8_t[]) {          // Set positive gamma
+        0x0F, 0x31, 0x2B, 0x0C, 0x0E, 0x08, 0x4E, 0xF1, 0x37, 0x07, 0x10, 0x03, 0x0E, 0x09, 0x00
+    }, 15);
+    esp_lcd_panel_io_tx_param(io_handle, 0xE1, (uint8_t[]) {          // Set negative gamma
+        0x00, 0x0E, 0x14, 0x03, 0x11, 0x07, 0x31, 0xC1, 0x48, 0x08, 0x0F, 0x0C, 0x31, 0x36, 0x0F
+    }, 15);
+#endif
+    *panel = panel_handle;
 }
 
 void app_main(void)
@@ -255,6 +391,9 @@ void app_main(void)
     // Display init
     ili9481_init();
     ili9481_draw_filled_rect(0, 0, DISP_WIDTH, DISP_HEIGHT, 0xF800);
+
+    esp_lcd_panel_io_handle_t io_handle = NULL;
+    example_init_i80_bus(&io_handle);
 
     // Draw black rectangle 100x100 px in pos x50, y50
     //ili9481_draw_filled_rect(50, 50, 100, 100, 0x0000);

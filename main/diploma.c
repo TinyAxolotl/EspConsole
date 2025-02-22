@@ -1,7 +1,10 @@
+#include <stdint.h>
 #include <stdio.h>
 #include "esp_err.h"
 #include "esp_chip_info.h"
 #include "esp_flash.h"
+#include "esp_lcd_io_i80.h"
+#include "hal/lcd_types.h"
 #include "spi_flash_mmap.h"
 #include "esp_heap_caps.h"
 #include "esp_psram.h"
@@ -17,16 +20,23 @@
 
 #include "esp_err.h"
 #include "esp_log.h"
+#include "esp_lcd_panel_interface.h"
 #include "esp_lcd_panel_io.h"
 #include "esp_lcd_panel_vendor.h"
 #include "esp_lcd_panel_ops.h"
+#include "esp_lcd_panel_commands.h"
+#include "esp_check.h"
+#include "esp_compiler.h"
+#include "esp_cache.h"
 
 #include "lvgl.h"
-
+#include <demos/lv_demos.h>
 #define TAG         "DIPLOM"
 
 #define DISP_WIDTH   320
 #define DISP_HEIGHT  480
+
+#define FB_SIZE ((DISP_WIDTH * DISP_HEIGHT) / 10)
 
 #define LCD_DB0   4
 #define LCD_DB1   5
@@ -46,129 +56,23 @@
 #define LCD_DB15  19
 
 #define LCD_RS    35
-#define LCD_WR    36
-#define LCD_CS    37
-#define LCD_RST   38
+#define LCD_WR    20
+#define LCD_CS    -1
+#define LCD_RST   21
 
 #define LCD_DATA_BUS_MASK (0xFFFF << 4)
 
-void lcd_set_data_bus(uint16_t data)
-{
-    GPIO.out_w1tc = LCD_DATA_BUS_MASK;
-    GPIO.out_w1ts = ((uint32_t)data << 4) & LCD_DATA_BUS_MASK;
-}
-
-void ili9481_send_command(uint8_t cmd)
-{
-    gpio_set_level(LCD_CS, 0);
-    gpio_set_level(LCD_RS, 0); // CMD mode
-    lcd_set_data_bus(cmd);
-    gpio_set_level(LCD_WR, 0);
-    esp_rom_delay_us(1);
-    gpio_set_level(LCD_WR, 1);
-    gpio_set_level(LCD_CS, 1);
-}
-
-/* TODO: Optimise this function. Send one bit might be useful, but 
-         more useful would be to send a pointer + size, and continiously
-         send data for (i = 0; i < data_len; i++)
-         Possibly might be done during LVGL integration.
-*/
-void ili9481_send_data(uint16_t data)
-{
-    gpio_set_level(LCD_CS, 0);
-    gpio_set_level(LCD_RS, 1);
-    lcd_set_data_bus(data);
-    gpio_set_level(LCD_WR, 0);
-    esp_rom_delay_us(1);
-    gpio_set_level(LCD_WR, 1);
-    gpio_set_level(LCD_CS, 1);
-}
-
-void ili9481_send_s_data(uint16_t data)
-{
-    lcd_set_data_bus(data);
-    gpio_set_level(LCD_WR, 0);
-    esp_rom_delay_us(1);
-    gpio_set_level(LCD_WR, 1);
-}
-
-void ili9481_init(void)
-{
-    // Hardware reset: RST LOW for 50 ms, RST HIGH for 50 ms
-    gpio_set_level(LCD_RST, 0);
-    vTaskDelay(pdMS_TO_TICKS(50));
-    gpio_set_level(LCD_RST, 1);
-    vTaskDelay(pdMS_TO_TICKS(50));
-    
-    // Soft-reset also. Just to be sure :)
-    ili9481_send_command(0x01);
-    vTaskDelay(pdMS_TO_TICKS(50));
-    
-    // Exit sleep mode
-    ili9481_send_command(0x11);
-    vTaskDelay(pdMS_TO_TICKS(120));
-    
-    // Set pixel format: 0x3A + 0x55 for 16-bit mode. It's enabled by default, however also just to be sure.
-    ili9481_send_command(0x3A);
-    ili9481_send_data(0x55);
-    
-    // Set columns addresses (0–319)
-    ili9481_send_command(0x2A);
-    ili9481_send_data(0x00);       // First col high byte
-    ili9481_send_data(0x00);       // First col low byte
-    ili9481_send_data(0x01);       // Final col high byte (319 >> 8)
-    ili9481_send_data(0x3F);       // Final col low byte (319 & 0xFF)
-    
-    // Set rows address (0–479)
-    ili9481_send_command(0x2B);
-    ili9481_send_data(0x00);       // First row high byte
-    ili9481_send_data(0x00);       // First row low byte
-    ili9481_send_data(0x01);       // Final row high byte (479 >> 8)
-    ili9481_send_data(0xDF);       // Final row low byte (479 = 0x1DF)
-    
-    ili9481_send_command(0x20);    // Exit invert mode
-
-    ili9481_send_command(0x36);
-    ili9481_send_data(0b00000010); // set orientation. TODO: Debug it. Investigate available orientation options.
-
-    // Enable display
-    ili9481_send_command(0x29);
-    vTaskDelay(pdMS_TO_TICKS(50));
-}
-
-// Test function to drww filled rect
-// x, y – left corner coords, width, height – size, color – 16-bit color val
-void ili9481_draw_filled_rect(uint16_t x, uint16_t y, uint16_t width, uint16_t height, uint16_t color)
-{
-    // Set columns
-    ili9481_send_command(0x2A);
-    ili9481_send_data(x >> 8);
-    ili9481_send_data(x & 0xFF);
-    ili9481_send_data((x + width - 1) >> 8);
-    ili9481_send_data((x + width - 1) & 0xFF);
-    
-    // Set rows
-    ili9481_send_command(0x2B);
-    ili9481_send_data(y >> 8);
-    ili9481_send_data(y & 0xFF);
-    ili9481_send_data((y + height - 1) >> 8);
-    ili9481_send_data((y + height - 1) & 0xFF);
-    
-    // Write to display memory cmd
-    ili9481_send_command(0x2C);
-    ili9481_send_data(color);
-
-    ili9481_send_command(0x3C);
-    gpio_set_level(LCD_CS, 0);
-    gpio_set_level(LCD_RS, 1);
-    // Fill everything with color
-    uint32_t total_pixels = width * height;
-    for (uint32_t i = 0; i < total_pixels; i++) {
-        ili9481_send_s_data(color);
-    }
-}
-
+typedef struct {
+    esp_lcd_panel_t base;
+    esp_lcd_panel_io_handle_t io;
+    int reset_gpio_num;
+    bool reset_level;
+    int x_gap;
+    int y_gap;
+    uint8_t fb_bits_per_pixel;
+    uint8_t madctl_val; // save current value of LCD_CMD_MADCTL register
+    uint8_t colmod_val; // save current value of LCD_CMD_COLMOD register
+} ili9481_panel_t;
 
 /* BT is disabled in menuconfig */
 int disable_wireless_peripherials()
@@ -188,35 +92,24 @@ int disable_wireless_peripherials()
 	return ESP_OK;
 }
 
-void my_flush_cb(lv_display_t *disp, const lv_area_t *area, uint8_t *color_map) {
-
-    esp_lcd_panel_handle_t panel_handle = lv_display_get_user_data(disp);
-    int offsetx1 = area->x1;
-    int offsetx2 = area->x2;
-    int offsety1 = area->y1;
-    int offsety2 = area->y2;
-
-    ili9481_send_command(0x2A);
-    ili9481_send_data((area->x1 >> 8) & 0xFF);
-    ili9481_send_data(area->x1 & 0xFF);
-    ili9481_send_data((area->x2 >> 8) & 0xFF);
-    ili9481_send_data(area->x2 & 0xFF);
-
-    ili9481_send_command(0x2B);
-    ili9481_send_data((area->y1 >> 8) & 0xFF);
-    ili9481_send_data(area->y1 & 0xFF);
-    ili9481_send_data((area->y2 >> 8) & 0xFF);
-    ili9481_send_data(area->y2 & 0xFF);
-
-    ili9481_send_command(0x2C);
-    ili9481_send_command(0x3C);
-    gpio_set_level(LCD_CS, 0);
-    gpio_set_level(LCD_RS, 1);
-
-    esp_lcd_panel_draw_bitmap(panel_handle, offsetx1, offsety1, offsetx2 + 1, offsety2 + 1, color_map);
-
+bool transaction_done_cb(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_io_event_data_t *edata, void *disp)
+{
     lv_display_flush_ready(disp);
-    printf("CB called and processed!\n");
+
+    return true;
+}
+
+
+void my_flush_cb(lv_display_t *disp, const lv_area_t *area, uint8_t *color_map) {
+    if (NULL == disp || NULL == area || NULL == color_map) {
+        ESP_LOGE(TAG, "Invalid parameters: disp = %p, area = %p, color_map = %p", disp, area, color_map);
+        lv_display_flush_ready(disp);
+        return;
+    }
+    
+    esp_lcd_panel_handle_t panel_handle = lv_display_get_user_data(disp);
+
+    esp_lcd_panel_draw_bitmap(panel_handle, area->x1, area->y1, area->x2 + 1, area->y2 + 1, color_map);
 }
 
 void tick_inc(void *pvParameters) {
@@ -225,6 +118,316 @@ void tick_inc(void *pvParameters) {
         lv_tick_inc(10);
     }
 }
+
+// Helper structure, inherited from the base panel
+typedef struct {
+    esp_lcd_panel_t base;                     // base class
+    esp_lcd_panel_io_handle_t io;             // handle for data/command transmission
+    int reset_gpio;                           // GPIO for hardware reset, if used
+    int x_gap;                                // X offset
+    int y_gap;                                // Y offset
+    // Additional internal states can be added, e.g., saving current MADCTL configuration
+} panel_ili9481_t;
+
+/***************************************************************************************************
+ * Panel deletion function
+ **************************************************************************************************/
+static esp_err_t panel_ili9481_del(esp_lcd_panel_t *panel)
+{
+    panel_ili9481_t *ili = __containerof(panel, panel_ili9481_t, base);
+    ESP_LOGI(TAG, "Deleting ILI9481 panel");
+
+    // Free GPIO if used for reset
+    if (ili->reset_gpio >= 0) {
+        gpio_reset_pin(ili->reset_gpio);
+    }
+    free(ili);
+    return ESP_OK;
+}
+
+/***************************************************************************************************
+ * Hardware and/or software reset of the ILI9481 panel
+ **************************************************************************************************/
+static esp_err_t panel_ili9481_reset(esp_lcd_panel_t *panel)
+{
+    panel_ili9481_t *ili = __containerof(panel, panel_ili9481_t, base);
+    ESP_LOGI(TAG, "Hardware reset ILI9481");
+
+    // Perform hardware reset if reset GPIO is defined
+    if (ili->reset_gpio >= 0) {
+        gpio_set_level(ili->reset_gpio, 0);
+        vTaskDelay(pdMS_TO_TICKS(10));
+        gpio_set_level(ili->reset_gpio, 1);
+        vTaskDelay(pdMS_TO_TICKS(50));
+    }
+
+    // Additionally, perform SW reset by sending the command
+    esp_lcd_panel_io_tx_param(ili->io, LCD_CMD_SWRESET, NULL, 0);
+    vTaskDelay(pdMS_TO_TICKS(50));
+
+    return ESP_OK;
+}
+
+/***************************************************************************************************
+ * ILI9481 display initialization
+ *
+ * This sends the command sequence required for proper display startup.
+ * The sequence may vary depending on the specific module requirements.
+ **************************************************************************************************/
+static esp_err_t panel_ili9481_init(esp_lcd_panel_t *panel)
+{
+    panel_ili9481_t *ili = __containerof(panel, panel_ili9481_t, base);
+    ESP_LOGI(TAG, "Initializing ILI9481");
+
+    // SW reset
+    esp_lcd_panel_io_tx_param(ili->io, 0x01, NULL, 0);
+    vTaskDelay(pdMS_TO_TICKS(120));
+
+    // Exit sleep mode
+    esp_lcd_panel_io_tx_param(ili->io, 0x11, NULL, 0);
+    vTaskDelay(pdMS_TO_TICKS(120));
+
+    // Set pixel format to 16-bit
+    uint8_t pixel_fmt = 0x55; 
+    esp_lcd_panel_io_tx_param(ili->io, 0x3A, &pixel_fmt, 1);
+
+    // Exit invert mode (if needed)
+    esp_lcd_panel_io_tx_param(ili->io, 0x20, NULL, 0);
+
+    // MADCTL (orientation, BGR/XYZ)
+    uint8_t madctl = 0x08; 
+    esp_lcd_panel_io_tx_param(ili->io, 0x36, &madctl, 1);
+
+    // Display on
+    esp_lcd_panel_io_tx_param(ili->io, 0x29, NULL, 0);
+    vTaskDelay(pdMS_TO_TICKS(50));
+
+    return ESP_OK;
+}
+
+/***************************************************************************************************
+ * Drawing a bitmap on the ILI9481 display
+ *
+ * x_start, y_start, x_end, y_end – drawing area coordinates (considering gap)
+ * color_data – pointer to color data (format depends on panel settings)
+ **************************************************************************************************/
+static inline esp_err_t panel_ili9481_draw_bitmap(esp_lcd_panel_t *panel,
+                                           int x_start, int y_start,
+                                           int x_end, int y_end,
+                                           const void *color_data)
+{
+    if (NULL == panel || NULL == color_data) {
+        ESP_LOGE(TAG, "Invalid parameters: panel = %p, color_data = %p", panel, color_data);
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    panel_ili9481_t *ili = __containerof(panel, panel_ili9481_t, base);
+
+    if (NULL == ili) {
+        ESP_LOGE(TAG, "Failed to get ili9481 panel handle: %p\n", ili);
+
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    // Store original values for width and height calculation
+    int orig_x_start = x_start;
+    int orig_y_start = y_start;
+
+    // Convert [x_start, x_end) to [x_start, x_end_incl], as the display requires inclusive bounds
+    int x_end_incl = x_end - 1;
+    int y_end_incl = y_end - 1;
+
+    // Apply gaps
+    x_start    += ili->x_gap;
+    x_end_incl += ili->x_gap;
+    y_start    += ili->y_gap;
+    y_end_incl += ili->y_gap;
+
+    uint8_t buf[4];
+
+    // Set columns (CASET)
+    buf[0] = (x_start >> 8) & 0xFF;
+    buf[1] = x_start & 0xFF;
+    buf[2] = (x_end_incl >> 8) & 0xFF;
+    buf[3] = x_end_incl & 0xFF;
+    esp_err_t err = esp_lcd_panel_io_tx_param(ili->io, LCD_CMD_CASET, buf, sizeof(buf));
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "CASET failed (error %d)", err);
+        return err;
+    }
+
+    // Set rows (RASET)
+    buf[0] = (y_start >> 8) & 0xFF;
+    buf[1] = y_start & 0xFF;
+    buf[2] = (y_end_incl >> 8) & 0xFF;
+    buf[3] = y_end_incl & 0xFF;
+    err = esp_lcd_panel_io_tx_param(ili->io, LCD_CMD_RASET, buf, sizeof(buf));
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "RASET failed (error %d)", err);
+        return err;
+    }
+
+    // Calculate the number of pixels: width = (x_end - orig_x_start), height = (y_end - orig_y_start)
+    int width  = x_end - orig_x_start;
+    int height = y_end - orig_y_start;
+    int pixel_count = width * height;
+
+    // Send color data (16 bits per pixel)
+    err = esp_lcd_panel_io_tx_color(ili->io, LCD_CMD_RAMWR, color_data, pixel_count * 2);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "RAMWR failed (error %d)", err);
+        return err;
+    }
+
+    return ESP_OK;
+}
+
+/***************************************************************************************************
+ * Invert display colors
+ **************************************************************************************************/
+static esp_err_t panel_ili9481_invert_color(esp_lcd_panel_t *panel, bool invert_color_data)
+{
+    panel_ili9481_t *ili = __containerof(panel, panel_ili9481_t, base);
+
+    if (invert_color_data) {
+        esp_lcd_panel_io_tx_param(ili->io, LCD_CMD_INVON, NULL, 0);
+    } else {
+        esp_lcd_panel_io_tx_param(ili->io, LCD_CMD_INVOFF, NULL, 0);
+    }
+    return ESP_OK;
+}
+
+/***************************************************************************************************
+ * Mirror display horizontally/vertically
+ *
+ * Uses MADCTL command to set bits responsible for mirroring.
+ * Bit values may need adjustment for the specific display.
+ **************************************************************************************************/
+static esp_err_t panel_ili9481_mirror(esp_lcd_panel_t *panel, bool mirror_x, bool mirror_y)
+{
+    panel_ili9481_t *ili = __containerof(panel, panel_ili9481_t, base);
+    uint8_t param = 0;
+
+    // Assume:
+    // - bit 0 controls horizontal mirroring
+    // - bit 1 controls vertical mirroring
+    if (mirror_x) {
+        param |= (1 << 0);
+    }
+    if (mirror_y) {
+        param |= (1 << 1);
+    }
+    esp_lcd_panel_io_tx_param(ili->io, LCD_CMD_MADCTL, &param, 1);
+    return ESP_OK;
+}
+
+/***************************************************************************************************
+ * Swap X and Y axes
+ *
+ * Usually done by setting the corresponding bit in MADCTL (e.g., bit for row/column exchange).
+ **************************************************************************************************/
+static esp_err_t panel_ili9481_swap_xy(esp_lcd_panel_t *panel, bool swap_axes)
+{
+    panel_ili9481_t *ili = __containerof(panel, panel_ili9481_t, base);
+    uint8_t param = 0;
+
+    // Assume bit 5 controls axis swapping
+    if (swap_axes) {
+        param |= (1 << 5);
+    }
+    esp_lcd_panel_io_tx_param(ili->io, LCD_CMD_MADCTL, &param, 1);
+    return ESP_OK;
+}
+
+/***************************************************************************************************
+ * Set gap offsets for X and Y axes
+ **************************************************************************************************/
+static esp_err_t panel_ili9481_set_gap(esp_lcd_panel_t *panel, int x_gap, int y_gap)
+{
+    panel_ili9481_t *ili = __containerof(panel, panel_ili9481_t, base);
+    ili->x_gap = x_gap;
+    ili->y_gap = y_gap;
+    return ESP_OK;
+}
+
+/***************************************************************************************************
+ * Turn display on/off
+ *
+ * Typical display commands:
+ *  - 0x29 for ON (DISPON)
+ *  - 0x28 for OFF (DISPOFF)
+ **************************************************************************************************/
+static esp_err_t panel_ili9481_disp_on_off(esp_lcd_panel_t *panel, bool off)
+{
+    panel_ili9481_t *ili = __containerof(panel, panel_ili9481_t, base);
+
+    if (off) {
+        esp_lcd_panel_io_tx_param(ili->io, 0x28, NULL, 0);
+    } else {
+        esp_lcd_panel_io_tx_param(ili->io, 0x29, NULL, 0);
+    }
+    return ESP_OK;
+}
+
+/***************************************************************************************************
+ * Enter/exit display sleep mode
+ *
+ * Typically:
+ *  - 0x10 – sleep in
+ *  - 0x11 – sleep out
+ **************************************************************************************************/
+static esp_err_t panel_ili9481_sleep(esp_lcd_panel_t *panel, bool sleep)
+{
+    panel_ili9481_t *ili = __containerof(panel, panel_ili9481_t, base);
+
+    if (sleep) {
+        esp_lcd_panel_io_tx_param(ili->io, LCD_CMD_SLPIN, NULL, 0);
+        vTaskDelay(pdMS_TO_TICKS(120));
+    } else {
+        esp_lcd_panel_io_tx_param(ili->io, LCD_CMD_SLPOUT, NULL, 0);
+        vTaskDelay(pdMS_TO_TICKS(120));
+    }
+    return ESP_OK;
+}
+
+/***************************************************************************************************
+ * Create (initialize) a new ILI9481 panel
+ *
+ * io – I/O handle for communication with the display;
+ * panel_dev_config – configuration structure (including offsets and reset GPIO);
+ * ret_panel – pointer to return the created panel.
+ **************************************************************************************************/
+esp_err_t esp_lcd_new_panel_ili9481(const esp_lcd_panel_io_handle_t io,
+                                    const esp_lcd_panel_dev_config_t *panel_dev_config,
+                                    esp_lcd_panel_handle_t *ret_panel)
+{
+    panel_ili9481_t *ili = calloc(1, sizeof(panel_ili9481_t));
+    if (!ili) {
+        return ESP_ERR_NO_MEM;
+    }
+
+    ili->base.del         = panel_ili9481_del;
+    ili->base.reset       = panel_ili9481_reset;
+    ili->base.init        = panel_ili9481_init;
+    ili->base.draw_bitmap = panel_ili9481_draw_bitmap;
+    ili->base.invert_color= panel_ili9481_invert_color;
+    ili->base.mirror      = panel_ili9481_mirror;
+    ili->base.swap_xy     = panel_ili9481_swap_xy;
+    ili->base.set_gap     = panel_ili9481_set_gap;
+    ili->base.disp_on_off = panel_ili9481_disp_on_off;
+    ili->base.disp_sleep  = panel_ili9481_sleep;
+
+    ili->io = io;
+    ili->x_gap = 0;
+    ili->y_gap = 0;
+
+    ili->reset_gpio = LCD_RST;
+
+    *ret_panel = &(ili->base);
+    ESP_LOGI(TAG, "ILI9481 panel created successfully");
+    return ESP_OK;
+}
+
 
 void example_init_i80_bus(esp_lcd_panel_io_handle_t *io_handle)
 {
@@ -260,7 +463,7 @@ void example_init_i80_bus(esp_lcd_panel_io_handle_t *io_handle)
 
     esp_lcd_panel_io_i80_config_t io_config = {
         .cs_gpio_num = LCD_CS,
-        .pclk_hz = 10000000,
+        .pclk_hz = 11000000, // 10 MHz TODO: Move to KConfig. After approx 11 MHz image starts corrupting. Too much speed for ILI display.
         .trans_queue_depth = 10,
         .dc_levels = {
             .dc_idle_level = 0,
@@ -269,78 +472,30 @@ void example_init_i80_bus(esp_lcd_panel_io_handle_t *io_handle)
             .dc_data_level = 1,
         },
         .lcd_cmd_bits = 8,
-        .lcd_param_bits = 16,
+        .lcd_param_bits = 8,
     };
     ESP_ERROR_CHECK(esp_lcd_new_panel_io_i80(i80_bus, &io_config, io_handle));
 }
 
+
 void example_init_lcd_panel(esp_lcd_panel_io_handle_t io_handle, esp_lcd_panel_handle_t *panel)
 {
     esp_lcd_panel_handle_t panel_handle = NULL;
-#if CONFIG_EXAMPLE_LCD_I80_CONTROLLER_ST7789
-    ESP_LOGI(TAG, "Install LCD driver of st7789");
+
+    ESP_LOGI(TAG, "Install LCD driver of ili9481");
     esp_lcd_panel_dev_config_t panel_config = {
-        .reset_gpio_num = EXAMPLE_PIN_NUM_RST,
+        .reset_gpio_num = LCD_RST,
         .rgb_ele_order = LCD_RGB_ELEMENT_ORDER_RGB,
         .bits_per_pixel = 16,
     };
-    ESP_ERROR_CHECK(esp_lcd_new_panel_st7789(io_handle, &panel_config, &panel_handle));
+    ESP_ERROR_CHECK(esp_lcd_new_panel_ili9481(io_handle, &panel_config, &panel_handle));
 
     esp_lcd_panel_reset(panel_handle);
     esp_lcd_panel_init(panel_handle);
     // Set inversion, x/y coordinate order, x/y mirror according to your LCD module spec
     // the gap is LCD panel specific, even panels with the same driver IC, can have different gap value
-    esp_lcd_panel_invert_color(panel_handle, true);
-    esp_lcd_panel_set_gap(panel_handle, 0, 20);
-#elif CONFIG_EXAMPLE_LCD_I80_CONTROLLER_NT35510
-    ESP_LOGI(TAG, "Install LCD driver of nt35510");
-    esp_lcd_panel_dev_config_t panel_config = {
-        .reset_gpio_num = EXAMPLE_PIN_NUM_RST,
-        .rgb_ele_order = LCD_RGB_ELEMENT_ORDER_BGR,
-        .bits_per_pixel = 16,
-    };
-    ESP_ERROR_CHECK(esp_lcd_new_panel_nt35510(io_handle, &panel_config, &panel_handle));
-
-    esp_lcd_panel_reset(panel_handle);
-    esp_lcd_panel_init(panel_handle);
-    // Set inversion, x/y coordinate order, x/y mirror according to your LCD module spec
-    // the gap is LCD panel specific, even panels with the same driver IC, can have different gap value
-    esp_lcd_panel_swap_xy(panel_handle, true);
-    esp_lcd_panel_mirror(panel_handle, true, false);
-#elif CONFIG_EXAMPLE_LCD_I80_CONTROLLER_ILI9341
-    // ILI9341 is NOT a distinct driver, but a special case of ST7789
-    // (essential registers are identical). A few lines further down in this code,
-    // it's shown how to issue additional device-specific commands.
-    ESP_LOGI(TAG, "Install LCD driver of ili9341 (st7789 compatible)");
-    esp_lcd_panel_dev_config_t panel_config = {
-        .reset_gpio_num = EXAMPLE_PIN_NUM_RST,
-        .rgb_ele_order = LCD_RGB_ELEMENT_ORDER_BGR,
-        .bits_per_pixel = 16,
-    };
-    ESP_ERROR_CHECK(esp_lcd_new_panel_st7789(io_handle, &panel_config, &panel_handle));
-
-    esp_lcd_panel_reset(panel_handle);
-    esp_lcd_panel_init(panel_handle);
-    // Set inversion, x/y coordinate order, x/y mirror according to your LCD module spec
-    // the gap is LCD panel specific, even panels with the same driver IC, can have different gap value
-    esp_lcd_panel_swap_xy(panel_handle, true);
-    esp_lcd_panel_invert_color(panel_handle, false);
-    // ILI9341 is very similar to ST7789 and shares the same driver.
-    // Anything unconventional (such as this custom gamma table) can
-    // be issued here in user code and need not modify the driver.
-    esp_lcd_panel_io_tx_param(io_handle, 0xF2, (uint8_t[]) {
-        0
-    }, 1); // 3Gamma function disable
-    esp_lcd_panel_io_tx_param(io_handle, 0x26, (uint8_t[]) {
-        1
-    }, 1); // Gamma curve 1 selected
-    esp_lcd_panel_io_tx_param(io_handle, 0xE0, (uint8_t[]) {          // Set positive gamma
-        0x0F, 0x31, 0x2B, 0x0C, 0x0E, 0x08, 0x4E, 0xF1, 0x37, 0x07, 0x10, 0x03, 0x0E, 0x09, 0x00
-    }, 15);
-    esp_lcd_panel_io_tx_param(io_handle, 0xE1, (uint8_t[]) {          // Set negative gamma
-        0x00, 0x0E, 0x14, 0x03, 0x11, 0x07, 0x31, 0xC1, 0x48, 0x08, 0x0F, 0x0C, 0x31, 0x36, 0x0F
-    }, 15);
-#endif
+    //esp_lcd_panel_swap_xy(panel_handle, true);
+    esp_lcd_panel_mirror(panel_handle, false, true);
     *panel = panel_handle;
 }
 
@@ -383,41 +538,38 @@ void app_main(void)
     io_conf.intr_type = GPIO_INTR_DISABLE;
     gpio_config(&io_conf);
     
-    // Configure control pins: RS, WR, CS, RST
+    // Configure control pins: RS, WR, CS, RST CS - GND now ((uint64_t)1 << LCD_CS) |
     io_conf.pin_bit_mask = ((uint64_t)1 << LCD_RS) | ((uint64_t)1 << LCD_WR) |
-                           ((uint64_t)1 << LCD_CS) | ((uint64_t)1 << LCD_RST);
+                            ((uint64_t)1 << LCD_RST);
     gpio_config(&io_conf);
-    
-    // Display init
-    ili9481_init();
-    ili9481_draw_filled_rect(0, 0, DISP_WIDTH, DISP_HEIGHT, 0xF800);
 
     esp_lcd_panel_io_handle_t io_handle = NULL;
     example_init_i80_bus(&io_handle);
+  
 
-    // Draw black rectangle 100x100 px in pos x50, y50
-    //ili9481_draw_filled_rect(50, 50, 100, 100, 0x0000);
+    esp_lcd_panel_handle_t panel_handle = NULL;
+    example_init_lcd_panel(io_handle, &panel_handle);
+
     lv_init();
 
-    static lv_color_t buf_1[DISP_WIDTH * 10];
-    static lv_color_t buf_2[DISP_WIDTH * 10];
-    printf("Ololo\n");
-    lv_display_t * disp = lv_display_create(DISP_WIDTH, DISP_HEIGHT); /* Basic initialization with horizontal and vertical resolution in pixels */
-    lv_display_set_flush_cb(disp, my_flush_cb); /* Set a flush callback to draw to the display */
-    lv_display_set_buffers(disp, buf_1, buf_2, sizeof(buf_1), LV_DISPLAY_RENDER_MODE_PARTIAL); /* Set an initialized buffer */
 
-    /* Change Active Screen's background color */
-    lv_obj_set_style_bg_color(lv_screen_active(), lv_color_hex(0x00FF00), LV_PART_MAIN);
-    lv_obj_set_style_text_color(lv_screen_active(), lv_color_hex(0xffffff), LV_PART_MAIN);
+    static lv_color_t buf_1[FB_SIZE];
+    static lv_color_t buf_2[FB_SIZE];
 
-    /* Create a spinner */
-    lv_obj_t * spinner = lv_spinner_create(lv_screen_active());
+    lv_display_t * disp = lv_display_create(DISP_WIDTH, DISP_HEIGHT);
+    if (NULL == panel_handle) {
+        printf("WTF HANDLE IS NULL!!!\n");
+    }
+    lv_display_set_user_data(disp, panel_handle);
+    lv_display_set_flush_cb(disp, my_flush_cb);
 
-    lv_spinner_set_anim_params(spinner, 1000, 60);
+    lv_display_set_buffers(disp, buf_1, buf_2, sizeof(buf_1), LV_DISPLAY_RENDER_MODE_PARTIAL);
+    const esp_lcd_panel_io_callbacks_t cbs = {
+        .on_color_trans_done = transaction_done_cb
+    };
 
-    lv_obj_set_size(spinner, 128, 128);
-
-    lv_obj_align(spinner, LV_ALIGN_CENTER, 0, 0);
+    esp_lcd_panel_io_register_event_callbacks(io_handle, &cbs, disp);
+    lv_demo_benchmark();
 
     xTaskCreate(tick_inc, "TickInc", 2048, NULL, 1, NULL);
     uint32_t nextRun = 0;

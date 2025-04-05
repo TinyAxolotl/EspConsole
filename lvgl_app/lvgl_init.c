@@ -19,7 +19,7 @@ void IRAM_ATTR lv_tick_hook(void)
     lv_tick_inc(portTICK_PERIOD_MS);
 }
 
-static
+IRAM_ATTR static
 void timer_handler(void *pvParameters) {
     uint32_t next_run = 0;
     while(true) {

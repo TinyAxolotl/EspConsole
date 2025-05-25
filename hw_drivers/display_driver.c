@@ -24,7 +24,7 @@ esp_err_t panel_ili9481_reset(esp_lcd_panel_t *panel)
     panel_ili9481_t *ili = __containerof(panel, panel_ili9481_t, base);
     ESP_LOGI(TAG, "Hardware reset ILI9481");
 
-    // Perform hardware reset if reset GPIO is defined
+    // Perform hardware reset if reset GPIO is defined TODO: Is it needed? Maybe bullshit?
     if (ili->reset_gpio >= 0) {
         gpio_set_level(ili->reset_gpio, 0);
         vTaskDelay(pdMS_TO_TICKS(10));
@@ -32,7 +32,7 @@ esp_err_t panel_ili9481_reset(esp_lcd_panel_t *panel)
         vTaskDelay(pdMS_TO_TICKS(50));
     }
 
-    // Additionally, perform SW reset by sending the command
+    // Additionally, perform SW reset by sending the command TODO: Is it needed? Maybe bullshit?
     esp_lcd_panel_io_tx_param(ili->io, LCD_CMD_SWRESET, NULL, 0);
     vTaskDelay(pdMS_TO_TICKS(50));
 

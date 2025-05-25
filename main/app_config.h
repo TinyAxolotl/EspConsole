@@ -15,6 +15,7 @@
 #define BITS_PER_PIXEL		DISP_BUS_WIDTH
 #define FB_SIZE 			((DISP_WIDTH * DISP_HEIGHT) / 10)
 
+/* LCD PINS */
 #define LCD_DB0   			4
 #define LCD_DB1   			5
 #define LCD_DB2   			6
@@ -36,6 +37,14 @@
 #define LCD_WR    			20
 #define LCD_CS    			-1
 #define LCD_RST   			21
+
+/* INPUT PINS */
+#define PREV_BTN     		41
+#define NEXT_BTN     		42
+#define ACCEPT_BTN   		47
+#define DECREASE_BTN 		48
+#define INCREASE_BTN 		38
+#define ESC_BTN      		2
 
 #define LCD_DATA_BUS_MASK 	(0xFFFF << 4)
 

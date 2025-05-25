@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include <stdio.h>
 
 #include "lvgl_init.h"
 #include "app_config.h"
@@ -9,9 +10,33 @@
 
 
 #define TAG "LVGL APPLICATION"
+void (*handle_input_event)(uint32_t key) = NULL;
 
 static esp_lcd_panel_io_handle_t lcd_io_handle = NULL;
 static esp_lcd_panel_handle_t panel_handle = NULL;
+
+static void button_read(lv_indev_t * indev, lv_indev_data_t * data)
+{
+    static uint32_t last_key = 0;
+    int key = read_button();
+
+    if (key >= 0) {
+        last_key = key;
+        data->state = LV_INDEV_STATE_PRESSED;
+        printf("Button read: %d (pressed)\n", key);
+        
+        // Вызываем обработчик, если он установлен
+        if (handle_input_event) {
+            handle_input_event((uint32_t)key);
+        } else {
+            printf("ERROR: handle_input_event is NULL in button_read\n");
+        }
+    } else {
+        data->state = LV_INDEV_STATE_RELEASED;
+    }
+
+    data->key = last_key;
+}
 
 static 
 void IRAM_ATTR lv_tick_hook(void)
@@ -50,6 +75,7 @@ void my_flush_cb(lv_display_t *display, const lv_area_t *area, uint8_t *color_ma
     esp_lcd_panel_draw_bitmap(panel_handle, area->x1, area->y1, area->x2 + 1, area->y2 + 1, color_map);
 }
 
+// PC -> 0xFFFF1234
 esp_err_t init_lvgl(lv_display_t **display)
 {
 	esp_err_t err = ESP_OK;
@@ -83,6 +109,10 @@ esp_err_t init_lvgl(lv_display_t **display)
 
     // TODO: Is 64kb stack & priority 15 enough?
     xTaskCreatePinnedToCore(timer_handler, "TimerHandler", 65535, NULL, 15, NULL, 1);
+
+    lv_indev_t * indev = lv_indev_create();
+    lv_indev_set_type(indev, LV_INDEV_TYPE_KEYPAD);
+    lv_indev_set_read_cb(indev, button_read);
 
     return err;
 }

@@ -25,7 +25,7 @@ void process_game_logic(void) {
             printf("Calling game update()\n");
             currentGame->update();
         } else {
-            printf("No active game to update\n");
+            printf("No active games to update\n");
         }
     }
 }

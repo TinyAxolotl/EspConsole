@@ -59,20 +59,6 @@ Known limitations:
 - Only basic debouncing is implemented for buttons.
 - The graphics use a partial buffer which may limit performance on very complex screens.
 
-## Diagrams
-
-### Architecture
-
-```plantuml
-!include docs/diagrams/architecture.puml
-```
-
-### Game Launch Sequence
-
-```plantuml
-!include docs/diagrams/game_launch_sequence.puml
-```
-
 ## Dependencies
 
 - [ESP‑IDF 5.4.1](https://github.com/espressif/esp-idf)

@@ -2,6 +2,9 @@
 #include "lvgl.h"
 #include "app.h"
 #include <cstdio>
+#include "esp_log.h"
+
+static const char *TAG = "MyComponent";
 
 extern "C" void (*handle_input_event)(uint32_t key);
 
@@ -19,24 +22,24 @@ InputRouter::InputRouter() {
 
     // Set global handler
     handle_input_event = [](uint32_t k) {
-        printf("Key press detected in InputRouter: %lu\n", k);
+        ESP_LOGI(TAG, "Key press detected in InputRouter: %lu", k);
         InputRouter::instance()->dispatchKey(k);
     };
     
-    printf("InputRouter initialized\n");
+    ESP_LOGI(TAG, "InputRouter initialized");
 }
 
 void InputRouter::dispatchKey(uint32_t key) {
-    printf("InputRouter dispatching key: %lu\n", key);
+    ESP_LOGI(TAG, "InputRouter dispatching key: %lu", key);
     if (cb_) {
         cb_(key);
     } else {
-        printf("WARNING: No callback registered in InputRouter\n");
+        ESP_LOGW(TAG, "No callback registered in InputRouter");
     }
 }
 
 void InputRouter::setCallback(Callback cb) {
-    printf("InputRouter callback set\n");
+    ESP_LOGI(TAG, "InputRouter callback set");
     cb_ = std::move(cb);
 }
 

@@ -5,6 +5,9 @@
 
 #include <cstdio>
 #include <algorithm>
+#include "esp_log.h"
+
+static const char *TAG = "MyComponent";
 
 
 RegisterRacing::RegisterRacing() {
@@ -62,7 +65,7 @@ void Racing::stop() {
     if (stopped_) return;
     stopped_ = true;
 
-    printf("Racing::stop() called\n");
+    ESP_LOGI(TAG, "Racing::stop() called");
     gameRunning_ = false;
 
     if (updateTimer_) {
@@ -101,7 +104,7 @@ void Racing::stop() {
         screen_ = nullptr;
     }
     
-    printf("Racing::stop() completed\n");
+    ESP_LOGI(TAG, "Racing::stop() completed");
 }
 
 void Racing::cleanupPlayer() {

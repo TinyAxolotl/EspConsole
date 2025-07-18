@@ -4,6 +4,9 @@
 #include <vector>
 #include <string>
 #include <memory>
+#include "esp_log.h"
+
+static const char *TAG = "MyComponent";
 
 using CreateGameFn = std::function<std::unique_ptr<Game>()>;
 
@@ -21,7 +24,7 @@ public:
     void debugPrintGames() const;
 private:
     GameRegistry() {
-        printf("GameRegistry constructor called\n");
+        ESP_LOGI(TAG, "GameRegistry constructor called");
     }
     std::vector<GameFactory> games_;
 };

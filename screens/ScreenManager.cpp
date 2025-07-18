@@ -1,5 +1,8 @@
 #include "ScreenManager.hpp"
 #include <cstdio>
+#include "esp_log.h"
+
+static const char *TAG = "MyComponent";
 
 ScreenManager* ScreenManager::instance_ = nullptr;
 
@@ -16,25 +19,25 @@ ScreenManager::ScreenManager()
         switchToGame(gameFactory);
     });
     
-    printf("ScreenManager constructed\n");
+    ESP_LOGI(TAG, "ScreenManager constructed");
 }
 
 void ScreenManager::init() {
     if (!initialized_) {
         InputRouter::instance()->setCallback([this](uint32_t key) {
-            printf("ScreenManager received key: %lu\n", key);
+            ESP_LOGI(TAG, "ScreenManager received key: %lu", key);
             handleInput(key);
         });
         
         initialized_ = true;
-        printf("ScreenManager initialized\n");
+        ESP_LOGI(TAG, "ScreenManager initialized");
     }
     
     switchToMenu();
 }
 
 void ScreenManager::switchToMenu() {
-    printf("Switching to Menu\n");
+    ESP_LOGI(TAG, "Switching to Menu");
     
     if (currentGame_) {
         Game* gameToDelete = currentGame_.release();
@@ -50,7 +53,7 @@ void ScreenManager::switchToMenu() {
 }
 
 void ScreenManager::switchToGame(const GameFactory& gameFactory) {
-    printf("Switching to Game: %s\n", gameFactory.name.c_str());
+    ESP_LOGI(TAG, "Switching to Game: %s", gameFactory.name.c_str());
     
     currentGame_ = gameFactory.create();
     
@@ -58,25 +61,25 @@ void ScreenManager::switchToGame(const GameFactory& gameFactory) {
         currentGame_->run();
         state_ = State::GAME;
     } else {
-        printf("Failed to create game\n");
+        ESP_LOGE(TAG, "Failed to create game");
         switchToMenu();
     }
 }
 
 void ScreenManager::handleInput(uint32_t key) {
-    printf("ScreenManager handling key: %lu, state: %d\n", key, (int)state_);
+    ESP_LOGI(TAG, "ScreenManager handling key: %lu, state: %d", key, (int)state_);
 
     if (state_ == State::GAME && (key == LV_KEY_ESC || key == LV_KEY_BACKSPACE)) {
-        printf("Exit from game requested by ScreenManager\n");
+        ESP_LOGI(TAG, "Exit from game requested by ScreenManager");
         switchToMenu();
         return;
     }
     
     if (state_ == State::MENU) {
-        printf("Passing key to MenuScreen: %lu\n", key);
+        ESP_LOGI(TAG, "Passing key to MenuScreen: %lu", key);
         menuScreen_.handleInput(key);
     } else if (state_ == State::GAME && currentGame_) {
-        printf("Passing key to Game: %lu\n", key);
+        ESP_LOGI(TAG, "Passing key to Game: %lu", key);
         currentGame_->handleKey(key);
     }
 }

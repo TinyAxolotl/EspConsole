@@ -7,6 +7,9 @@
 #include "freertos/task.h"
 #include <stdint.h>
 #include <stdio.h>
+#include "esp_log.h"
+
+static const char *TAG = "MyComponent";
 
 typedef struct {
     int pin;
@@ -67,7 +70,7 @@ void init_gpio() {
 
     init_input_pins();
     
-    printf("GPIO initialized with debouncing\n");
+    ESP_LOGI(TAG, "GPIO initialized with debouncing");
 }
 
 int read_button() {
@@ -83,7 +86,7 @@ int read_button() {
                 btn->last_press_time = current_time;
                 btn->previous_state = btn->current_state;
                 
-                printf("%s pressed (debounced)\n", btn->name);
+                ESP_LOGI(TAG, "%s pressed (debounced)", btn->name);
                 return btn->lv_key;
             }
         } else if (btn->previous_state == 0 && btn->current_state == 1) {

@@ -9,7 +9,7 @@
 #include "display_driver.h"
 
 
-#define TAG "LVGL APPLICATION"
+static const char *TAG = "MyComponent";
 void (*handle_input_event)(uint32_t key) = NULL;
 
 static esp_lcd_panel_io_handle_t lcd_io_handle = NULL;
@@ -23,12 +23,12 @@ static void button_read(lv_indev_t * indev, lv_indev_data_t * data)
     if (key >= 0) {
         last_key = key;
         data->state = LV_INDEV_STATE_PRESSED;
-        printf("Button read: %d (pressed)\n", key);
+        ESP_LOGI(TAG, "Button read: %d (pressed)", key);
         
         if (handle_input_event) {
             handle_input_event((uint32_t)key);
         } else {
-            printf("ERROR: handle_input_event is NULL in button_read\n");
+            ESP_LOGE(TAG, "handle_input_event is NULL in button_read");
         }
     } else {
         data->state = LV_INDEV_STATE_RELEASED;

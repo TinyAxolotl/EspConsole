@@ -9,7 +9,7 @@
 #include <stdio.h>
 #include "esp_log.h"
 
-static const char *TAG = "MyComponent";
+static const char *TAG = "GPIO_DRIVER";
 
 typedef struct {
     int pin;

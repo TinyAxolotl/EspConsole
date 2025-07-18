@@ -4,7 +4,7 @@
 #include <algorithm>
 #include "esp_log.h"
 
-static const char *TAG = "MyComponent";
+static const char *TAG = "SimpleCatcher";
 
 RegisterSimpleCatcher::RegisterSimpleCatcher() {
     ESP_LOGI(TAG, "Registering Simple Catcher game");

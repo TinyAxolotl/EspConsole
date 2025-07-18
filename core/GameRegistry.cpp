@@ -2,7 +2,7 @@
 #include <cstdio>
 #include "esp_log.h"
 
-static const char *TAG = "MyComponent";
+static const char *TAG = "GameRegistry";
 
 GameRegistry& GameRegistry::instance() {
     static GameRegistry inst;

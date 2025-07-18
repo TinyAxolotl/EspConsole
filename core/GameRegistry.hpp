@@ -6,7 +6,7 @@
 #include <memory>
 #include "esp_log.h"
 
-static const char *TAG = "MyComponent";
+static const char *TAG = "GameRegistry";
 
 using CreateGameFn = std::function<std::unique_ptr<Game>()>;
 

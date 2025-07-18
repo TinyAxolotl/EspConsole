@@ -10,7 +10,7 @@
 #include <algorithm>
 #include "esp_log.h"
 
-static const char *TAG = "MyComponent";
+static const char *TAG = "TowerBloxx";
 
 RegisterTowerBloxx::RegisterTowerBloxx() {
     GameRegistry::instance().registerGame("Tower Bloxx", []() {

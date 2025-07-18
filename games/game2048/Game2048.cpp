@@ -4,7 +4,7 @@
 #include <cstdio>
 #include "esp_log.h"
 
-static const char *TAG = "MyComponent";
+static const char *TAG = "Game2048";
 #include <cstring>
 
 Game2048::~Game2048() {

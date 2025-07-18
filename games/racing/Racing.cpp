@@ -7,7 +7,7 @@
 #include <algorithm>
 #include "esp_log.h"
 
-static const char *TAG = "MyComponent";
+static const char *TAG = "Racing";
 
 
 RegisterRacing::RegisterRacing() {

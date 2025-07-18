@@ -4,7 +4,7 @@
 #include <cstdio>
 #include "esp_log.h"
 
-static const char *TAG = "MyComponent";
+static const char *TAG = "InputRouter";
 
 extern "C" void (*handle_input_event)(uint32_t key);
 

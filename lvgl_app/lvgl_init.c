@@ -9,7 +9,7 @@
 #include "display_driver.h"
 
 
-static const char *TAG = "MyComponent";
+static const char *TAG = "lvgl_init";
 void (*handle_input_event)(uint32_t key) = NULL;
 
 static esp_lcd_panel_io_handle_t lcd_io_handle = NULL;

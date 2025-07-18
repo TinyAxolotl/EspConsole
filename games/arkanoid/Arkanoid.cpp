@@ -6,7 +6,7 @@
 #include <cmath>
 #include "esp_log.h"
 
-static const char *TAG = "MyComponent";
+static const char *TAG = "Arkanoid";
 
 RegisterArkanoid::RegisterArkanoid() {
     ESP_LOGI(TAG, "Registering Arkanoid game");

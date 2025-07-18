@@ -14,13 +14,11 @@ void process_game_logic(void) {
     if (!initialized) {
         printf("Initializing game logic\n");
 
-        // Init ScreenManager
         ScreenManager::instance().init();
 
         initialized = true;
     }
 
-    // In case if GAME Started - update it's state.
     if (ScreenManager::instance().state() == ScreenManager::State::GAME) {
         Game* currentGame = ScreenManager::instance().getCurrentGame();
         if (currentGame) {

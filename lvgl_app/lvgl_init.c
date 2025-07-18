@@ -25,7 +25,6 @@ static void button_read(lv_indev_t * indev, lv_indev_data_t * data)
         data->state = LV_INDEV_STATE_PRESSED;
         printf("Button read: %d (pressed)\n", key);
         
-        // Вызываем обработчик, если он установлен
         if (handle_input_event) {
             handle_input_event((uint32_t)key);
         } else {

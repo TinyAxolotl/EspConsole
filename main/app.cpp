@@ -5,6 +5,9 @@
 #include "GamesConnector.hpp"
 #include "lvgl.h"
 #include <cstdio>
+#include "esp_log.h"
+
+static const char *TAG = "App";
 
 extern "C" void (*handle_input_event)(uint32_t key);
 
@@ -12,7 +15,7 @@ static bool initialized = false;
 
 void process_game_logic(void) {
     if (!initialized) {
-        printf("Initializing game logic\n");
+        ESP_LOGI(TAG, "Initializing game logic");
 
         ScreenManager::instance().init();
 
@@ -22,10 +25,10 @@ void process_game_logic(void) {
     if (ScreenManager::instance().state() == ScreenManager::State::GAME) {
         Game* currentGame = ScreenManager::instance().getCurrentGame();
         if (currentGame) {
-            printf("Calling game update()\n");
+            ESP_LOGI(TAG, "Calling game update()");
             currentGame->update();
         } else {
-            printf("No active game to update\n");
+            ESP_LOGI(TAG, "No active game to update");
         }
     }
 }

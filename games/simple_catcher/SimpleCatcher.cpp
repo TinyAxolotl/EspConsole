@@ -2,9 +2,12 @@
 #include "GameRegistry.hpp"
 #include <cstdio>
 #include <algorithm>
+#include "esp_log.h"
+
+static const char *TAG = "SimpleCatcher";
 
 RegisterSimpleCatcher::RegisterSimpleCatcher() {
-    printf("Registering Simple Catcher game\n");
+    ESP_LOGI(TAG, "Registering Simple Catcher game");
     GameRegistry::instance().registerGame("Simple Catcher", []() {
         return std::make_unique<SimpleCatcher>();
     });
@@ -23,7 +26,7 @@ SimpleCatcher::~SimpleCatcher() {
 }
 
 void SimpleCatcher::run() {
-    printf("Starting Simple Catcher game\n");
+    ESP_LOGI(TAG, "Starting Simple Catcher game");
     createGameScreen();
     resetGame();
     gameRunning_ = true;

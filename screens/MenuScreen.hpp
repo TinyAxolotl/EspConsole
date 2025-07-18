@@ -4,8 +4,6 @@
 #include "GameRegistry.hpp"
 #include "InputRouter.hpp"
 #include "lvgl.h"
-#include <cstddef>
-#include <cstdlib>
 #include <functional>
 
 class MenuScreen : public Screen {
@@ -30,8 +28,9 @@ private:
     void updateSelection();
     
     lv_obj_t* screen_ = nullptr;
-    lv_obj_t* list_ = nullptr;
-    lv_obj_t* title_ = nullptr;
+    lv_obj_t* list_   = nullptr;
+    lv_obj_t* title_  = nullptr;
+    lv_obj_t* hint_   = nullptr;
     lv_obj_t* items_[10] = {nullptr};
     
     int selectedIndex_ = 0;

@@ -36,7 +36,14 @@ void ScreenManager::init() {
 void ScreenManager::switchToMenu() {
     printf("Switching to Menu\n");
     
-    currentGame_.reset();
+    if (currentGame_) {
+        Game* gameToDelete = currentGame_.release();
+        lv_async_call([](void* p) {
+            Game* game = static_cast<Game*>(p);
+            game->stop();
+            delete game;
+        }, gameToDelete);
+    }
     
     menuScreen_.show();
     state_ = State::MENU;
@@ -58,8 +65,9 @@ void ScreenManager::switchToGame(const GameFactory& gameFactory) {
 
 void ScreenManager::handleInput(uint32_t key) {
     printf("ScreenManager handling key: %lu, state: %d\n", key, (int)state_);
-    
-    if (state_ == State::GAME && key == LV_KEY_ESC) {
+
+    if (state_ == State::GAME && (key == LV_KEY_ESC || key == LV_KEY_BACKSPACE)) {
+        printf("Exit from game requested by ScreenManager\n");
         switchToMenu();
         return;
     }

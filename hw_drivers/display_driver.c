@@ -24,7 +24,6 @@ esp_err_t panel_ili9481_reset(esp_lcd_panel_t *panel)
     panel_ili9481_t *ili = __containerof(panel, panel_ili9481_t, base);
     ESP_LOGI(TAG, "Hardware reset ILI9481");
 
-    // Perform hardware reset if reset GPIO is defined TODO: Is it needed? Maybe bullshit?
     if (ili->reset_gpio >= 0) {
         gpio_set_level(ili->reset_gpio, 0);
         vTaskDelay(pdMS_TO_TICKS(10));
@@ -32,14 +31,12 @@ esp_err_t panel_ili9481_reset(esp_lcd_panel_t *panel)
         vTaskDelay(pdMS_TO_TICKS(50));
     }
 
-    // Additionally, perform SW reset by sending the command TODO: Is it needed? Maybe bullshit?
     esp_lcd_panel_io_tx_param(ili->io, LCD_CMD_SWRESET, NULL, 0);
     vTaskDelay(pdMS_TO_TICKS(50));
 
     return ESP_OK;
 }
 
-// TODO: Take a look on available init on github if available, just curious how others inits it
 esp_err_t panel_ili9481_init(esp_lcd_panel_t *panel)
 {
     panel_ili9481_t *ili = __containerof(panel, panel_ili9481_t, base);
@@ -97,7 +94,6 @@ esp_err_t panel_ili9481_draw_bitmap(esp_lcd_panel_t *panel,
         return ESP_ERR_INVALID_ARG;
     }
 
-    // TODO: Refactor below lines in future, should be more simple approach. 
 
     // Store original values for width and height calculation
     int orig_x_start = x_start;
@@ -305,7 +301,7 @@ esp_err_t init_i80_bus(esp_lcd_panel_io_handle_t *io_handle)
 
     esp_lcd_panel_io_i80_config_t io_config = {
         .cs_gpio_num = LCD_CS,
-        .pclk_hz = LCD_FREQUENCY_HZ, // 10 MHz TODO: Move to KConfig. After approx 11 MHz image starts corrupting. Too much speed for ILI display.
+        .pclk_hz = LCD_FREQUENCY_HZ, // 10 MHz 
         .trans_queue_depth = 10,
         .dc_levels = {
             .dc_idle_level = 0,
@@ -345,8 +341,6 @@ esp_err_t init_lcd_display(esp_lcd_panel_handle_t *panel, esp_lcd_panel_io_handl
 
     esp_lcd_panel_reset(panel_handle);
     esp_lcd_panel_init(panel_handle);
-
-    // TODO: Test couple of mirror & swap options. Is it make sense? Maybe it might be easier to mirror via lvgl if needed?
 
     //esp_lcd_panel_swap_xy(panel_handle, true);
     esp_lcd_panel_mirror(panel_handle, false, true);

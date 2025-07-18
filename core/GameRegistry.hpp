@@ -4,9 +4,6 @@
 #include <vector>
 #include <string>
 #include <memory>
-#include "esp_log.h"
-
-static const char *TAG = "GameRegistry";
 
 using CreateGameFn = std::function<std::unique_ptr<Game>()>;
 
@@ -23,8 +20,6 @@ public:
     const std::vector<GameFactory>& available() const;
     void debugPrintGames() const;
 private:
-    GameRegistry() {
-        ESP_LOGI(TAG, "GameRegistry constructor called");
-    }
+    GameRegistry();
     std::vector<GameFactory> games_;
 };

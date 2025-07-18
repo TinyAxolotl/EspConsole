@@ -4,6 +4,10 @@
 
 static const char *TAG = "GameRegistry";
 
+GameRegistry::GameRegistry() {
+    ESP_LOGI(TAG, "GameRegistry constructor called");
+}
+
 GameRegistry& GameRegistry::instance() {
     static GameRegistry inst;
     return inst;

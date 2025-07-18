@@ -1,0 +1,37 @@
+@startuml
+!theme plain
+class InputRouter {
+  +dispatchKey(key)
+  +setCallback(cb)
+}
+class ScreenManager {
+  -MenuScreen menuScreen
+  -Game currentGame
+  -State state
+  +init()
+  +switchToMenu()
+  +switchToGame(GameFactory)
+  +handleInput(key)
+}
+class MenuScreen {
+  +show()
+  +handleInput(key)
+  +setGameSelectedCallback(cb)
+}
+class GameRegistry {
+  +registerGame(name, fn)
+  +available()
+}
+abstract class Game {
+  +run()
+  +update()
+  +stop()
+  +handleKey(key)
+  +name()
+}
+InputRouter --> ScreenManager : forwards key events
+ScreenManager --> MenuScreen : displays menu
+ScreenManager --> Game : runs
+MenuScreen --> GameRegistry : list games
+GameRegistry ..> Game : create instances
+@enduml

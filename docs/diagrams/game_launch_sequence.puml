@@ -1,0 +1,19 @@
+@startuml
+!theme plain
+actor User
+participant InputRouter
+participant ScreenManager
+participant MenuScreen
+participant GameRegistry
+participant Game
+
+User -> InputRouter : press ENTER
+InputRouter -> ScreenManager : dispatchKey(ENTER)
+ScreenManager -> MenuScreen : handleInput(ENTER)
+MenuScreen -> GameRegistry : request GameFactory
+GameRegistry --> ScreenManager : return create()
+ScreenManager -> Game : run()
+User -> InputRouter : gameplay keys
+InputRouter -> ScreenManager : dispatchKey()
+ScreenManager -> Game : handleKey()
+@enduml

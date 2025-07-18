@@ -39,7 +39,7 @@ void BaseGame::handleKey(uint32_t key) {
 
 void BaseGame::updateAdapter(lv_timer_t* timer) {
     if (!timer) return;
-    BaseGame* self = static_cast<BaseGame*>(timer->user_data);
+    BaseGame* self = static_cast<BaseGame*>(lv_timer_get_user_data(timer));
     if (self) {
         self->update();
     }

@@ -4,9 +4,12 @@
 #include "lvgl_helper.hpp"
 #include <cstdio>
 #include <cmath>
+#include "esp_log.h"
+
+static const char *TAG = "Arkanoid";
 
 RegisterArkanoid::RegisterArkanoid() {
-    printf("Registering Arkanoid game\n");
+    ESP_LOGI(TAG, "Registering Arkanoid game");
     GameRegistry::instance().registerGame("Arkanoid", []() {
         return std::make_unique<Arkanoid>();
     });
@@ -33,7 +36,7 @@ Arkanoid::~Arkanoid() {
 }
 
 void Arkanoid::run() {
-    printf("Starting Arkanoid game\n");
+    ESP_LOGI(TAG, "Starting Arkanoid game");
     createGameScreen();
     resetGame();
     gameRunning_ = true;
@@ -84,7 +87,7 @@ void Arkanoid::stop() {
     if (stopped_) return;
     stopped_ = true;
 
-    printf("Arkanoid::stop() called\n");
+    ESP_LOGI(TAG, "Arkanoid::stop() called");
     gameRunning_ = false;
     
     if (updateTimer_) {
@@ -130,7 +133,7 @@ void Arkanoid::handleKey(uint32_t key) {
                 ball_.vx = ballSpeed_;
                 ball_.vy = -ballSpeed_;
                 enterPressed_ = true;
-                printf("Ball launched!\n");
+                ESP_LOGI(TAG, "Ball launched!");
             }
             break;
             

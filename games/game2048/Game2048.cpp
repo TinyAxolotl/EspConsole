@@ -2,6 +2,9 @@
 #include "GameRegistry.hpp"
 #include "lvgl_helper.hpp"
 #include <cstdio>
+#include "esp_log.h"
+
+static const char *TAG = "Game2048";
 #include <cstring>
 
 Game2048::~Game2048() {
@@ -47,7 +50,7 @@ void Game2048::stop() {
     if(stopped_) return;
     stopped_ = true;
     gameRunning_ = false;
-    printf("2048::stop() called\n");
+    ESP_LOGI(TAG, "2048::stop() called");
 
     if(screen_ && lv_obj_is_valid(screen_)) {
         lv_obj_clean(screen_);
@@ -56,7 +59,7 @@ void Game2048::stop() {
         screen_ = nullptr;
     }
 
-    printf("2048::stop() completed\n");
+    ESP_LOGI(TAG, "2048::stop() completed");
 }
 
 void Game2048::handleKey(uint32_t key) {

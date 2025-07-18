@@ -20,8 +20,6 @@ public:
     const std::vector<GameFactory>& available() const;
     void debugPrintGames() const;
 private:
-    GameRegistry() {
-        printf("GameRegistry constructor called\n");
-    }
+    GameRegistry();
     std::vector<GameFactory> games_;
 };

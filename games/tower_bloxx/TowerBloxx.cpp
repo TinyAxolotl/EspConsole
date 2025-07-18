@@ -8,6 +8,9 @@
 #include "green_centre.h"
 #include <cstdio>
 #include <algorithm>
+#include "esp_log.h"
+
+static const char *TAG = "TowerBloxx";
 
 RegisterTowerBloxx::RegisterTowerBloxx() {
     GameRegistry::instance().registerGame("Tower Bloxx", []() {
@@ -33,7 +36,7 @@ TowerBloxx::TowerBloxx()
      rd_(),
      gen_(rd_())
 {
-    printf("TowerBloxx constructor called\n");
+    ESP_LOGI(TAG, "TowerBloxx constructor called");
     currentBlock_.obj = nullptr;
     currentBlock_.x = 0;
     currentBlock_.y = 0;
@@ -43,17 +46,17 @@ TowerBloxx::TowerBloxx()
 }
 
 TowerBloxx::~TowerBloxx() {
-    printf("TowerBloxx destructor called\n");
+    ESP_LOGI(TAG, "TowerBloxx destructor called");
     stop();
 }
 
 void TowerBloxx::run() {
-    printf("TowerBloxx::run() called\n");
+    ESP_LOGI(TAG, "TowerBloxx::run() called");
     createGameScreen();
     gameRunning_ = true;      
     resetGame();
     waitingForPlayer_ = true;
-    printf("TowerBloxx game started, waiting for player input\n");
+    ESP_LOGI(TAG, "TowerBloxx game started, waiting for player input");
 }
 
 void TowerBloxx::update() {
@@ -61,16 +64,16 @@ void TowerBloxx::update() {
 }
 
 void TowerBloxx::stop() {
-    printf("TowerBloxx::stop() called\n");
+    ESP_LOGI(TAG, "TowerBloxx::stop() called");
     
     if (!gameRunning_ && !screen_) {
-        printf("TowerBloxx already stopped\n");
+        ESP_LOGW(TAG, "TowerBloxx already stopped");
         return;
     }
     
     gameRunning_ = false;
     
-    printf("Stopping all animations\n");
+    ESP_LOGI(TAG, "Stopping all animations");
     lv_anim_del_all();
     
     for (auto& block : blocks_) {
@@ -87,7 +90,7 @@ void TowerBloxx::stop() {
     }
     
     if (screen_) {
-        printf("Deleting screen\n");
+        ESP_LOGI(TAG, "Deleting screen");
         lv_obj_del(screen_);
         screen_ = nullptr;
         gameContainer_ = nullptr;
@@ -96,33 +99,33 @@ void TowerBloxx::stop() {
         instructionsLabel_ = nullptr;
     }
     
-    printf("TowerBloxx::stop() completed\n");
+    ESP_LOGI(TAG, "TowerBloxx::stop() completed");
 }
 
 void TowerBloxx::handleKey(uint32_t key) {
-    printf("TowerBloxx::handleKey called with key: %lu\n", key);
-    printf("Current state: gameRunning=%d, waitingForPlayer=%d, blockDropping=%d\n", 
+    ESP_LOGI(TAG, "TowerBloxx::handleKey called with key: %lu", key);
+    ESP_LOGI(TAG, "Current state: gameRunning=%d, waitingForPlayer=%d, blockDropping=%d",
            gameRunning_, waitingForPlayer_, blockDropping_);
-    printf("Current block: obj=%p, isMoving=%d\n", currentBlock_.obj, currentBlock_.isMoving);
+    ESP_LOGI(TAG, "Current block: obj=%p, isMoving=%d", currentBlock_.obj, currentBlock_.isMoving);
     
     if (!gameRunning_) return;
     
     switch (key) {
         case LV_KEY_ENTER:
         case LV_KEY_DOWN:
-            printf("Drop key pressed\n");
+            ESP_LOGI(TAG, "Drop key pressed");
             
             if (waitingForPlayer_) {
-                printf("Creating first block\n");
+                ESP_LOGI(TAG, "Creating first block");
                 spawnNewBlock();
                 waitingForPlayer_ = false;
             } 
             else if (currentBlock_.obj && currentBlock_.isMoving && !blockDropping_) {
-                printf("Dropping swinging block\n");
+                ESP_LOGI(TAG, "Dropping swinging block");
                 dropBlock();
             }
             else {
-                printf("No swinging block to drop or already dropping - ignoring input\n");
+                ESP_LOGI(TAG, "No swinging block to drop or already dropping - ignoring input");
             }
             break;
     }
@@ -161,7 +164,7 @@ void drawPlatformDecor(lv_obj_t* base) {
 }
 
 void TowerBloxx::createGameScreen() {
-    printf("TowerBloxx::createGameScreen() called\n");
+    ESP_LOGI(TAG, "TowerBloxx::createGameScreen() called");
     
     screen_ = createCleanObject(nullptr);
     lv_obj_set_style_bg_color(screen_, lv_color_make(235, 206, 135), 0);
@@ -183,7 +186,7 @@ void TowerBloxx::createGameScreen() {
         lv_obj_set_style_bg_opa(scoreLabel_, 180, 0);
         lv_obj_set_style_pad_all(scoreLabel_, 5, 0);
         lv_label_set_text(scoreLabel_, "Score: 0\nHeight: 0");
-        printf("scoreLabel created successfully\n");
+        ESP_LOGI(TAG, "scoreLabel created successfully");
     }
     
     towerBase_ = createCleanObject(gameContainer_);
@@ -202,14 +205,14 @@ void TowerBloxx::createGameScreen() {
     lv_obj_set_style_text_align(instructionsLabel_, LV_TEXT_ALIGN_CENTER, 0);
     
     lv_scr_load(screen_);
-    printf("Game screen created\n");
+    ESP_LOGI(TAG, "Game screen created");
 }
 
 void TowerBloxx::resetGame() {
-    printf("TowerBloxx::resetGame() called\n");
+    ESP_LOGI(TAG, "TowerBloxx::resetGame() called");
     
     if (!gameContainer_) {
-        printf("resetGame called but container null\n");
+        ESP_LOGW(TAG, "resetGame called but container null");
         return;
     }
     
@@ -222,24 +225,24 @@ void TowerBloxx::resetGame() {
 
     updateScore();
     
-    printf("Clearing existing blocks...\n");
+    ESP_LOGI(TAG, "Clearing existing blocks...");
     for (size_t i = 0; i < blocks_.size(); i++) {
         if (blocks_[i].obj) {
-            printf("Deleting block %zu obj=%p\n", i, blocks_[i].obj);
+            ESP_LOGI(TAG, "Deleting block %zu obj=%p", i, blocks_[i].obj);
             lv_obj_del(blocks_[i].obj);
         }
     }
     blocks_.clear();
-    printf("All blocks cleared. blocks_.size() = %zu\n", blocks_.size());
+    ESP_LOGI(TAG, "All blocks cleared. blocks_.size() = %zu", blocks_.size());
     
     if (currentBlock_.obj) {
-        printf("Clearing currentBlock_.obj=%p\n", currentBlock_.obj);
+        ESP_LOGI(TAG, "Clearing currentBlock_.obj=%p", currentBlock_.obj);
         lv_anim_del(currentBlock_.obj, NULL);
         lv_obj_del(currentBlock_.obj);
         currentBlock_.obj = nullptr;
     }
     
-    printf("Creating base block...\n");
+    ESP_LOGI(TAG, "Creating base block...");
     Block base;
     base.x = (lv_disp_get_hor_res(nullptr) - baseBlockWidth_) / 2;
     base.y = baseY_ - blockHeight_;
@@ -254,17 +257,17 @@ void TowerBloxx::resetGame() {
 
     blocks_.clear();
 
-    printf("Base block object created: %p\n", base.obj);
+    ESP_LOGI(TAG, "Base block object created: %p", base.obj);
 
     lv_obj_set_pos(base.obj, base.x, base.y);
 
-    printf("Adding base block to blocks_ vector...\n");
+    ESP_LOGI(TAG, "Adding base block to blocks_ vector...");
     blocks_.push_back(base);
-    printf("Base block added! blocks_.size() = %zu\n", blocks_.size());
-    printf("Base block details: obj=%p, pos=(%d,%d), size=%d\n", 
+    ESP_LOGI(TAG, "Base block added! blocks_.size() = %zu", blocks_.size());
+    ESP_LOGI(TAG, "Base block details: obj=%p, pos=(%d,%d), size=%d",
            blocks_[0].obj, blocks_[0].x, blocks_[0].y, blocks_[0].width);
     
-    printf("Reset game completed successfully\n");
+    ESP_LOGI(TAG, "Reset game completed successfully");
 }
 
 void TowerBloxx::spawnNewBlock() {
@@ -372,7 +375,7 @@ void TowerBloxx::updateCamera() {
 
     if (worldTopY < cameraY_ + desiredTopOffset) {
         cameraY_ = worldTopY - desiredTopOffset;
-        printf("CameraY updated: %d\n", cameraY_);
+        ESP_LOGI(TAG, "CameraY updated: %d", cameraY_);
 
         for (auto& block : blocks_) {
             if (block.obj) {
@@ -408,7 +411,7 @@ void TowerBloxx::updateCamera() {
 
 void TowerBloxx::updateScore() {
     if (!scoreLabel_) {
-        printf("updateScore called but scoreLabel is null\n");
+        ESP_LOGW(TAG, "updateScore called but scoreLabel is null");
         return;
     }
     
@@ -416,13 +419,13 @@ void TowerBloxx::updateScore() {
     int result = snprintf(scoreText, sizeof(scoreText), "Score: %d\nHeight: %d", score_, towerHeight_);
     
     if (result < 0 || result >= sizeof(scoreText)) {
-        printf("Error formatting score text\n");
+        ESP_LOGE(TAG, "Error formatting score text");
         lv_label_set_text(scoreLabel_, "Score: Error");
         return;
     }
     
     lv_label_set_text(scoreLabel_, scoreText);
-    printf("Score updated: %s\n", scoreText);
+    ESP_LOGI(TAG, "Score updated: %s", scoreText);
 }
 
 void TowerBloxx::swingAnimationCallback(void* obj, int32_t value) {

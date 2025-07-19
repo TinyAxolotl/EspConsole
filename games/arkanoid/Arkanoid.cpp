@@ -10,16 +10,16 @@ static const char *TAG = "Arkanoid";
 
 RegisterArkanoid::RegisterArkanoid() {
     ESP_LOGI(TAG, "Registering Arkanoid game");
-    GameRegistry::instance().registerGame("Arkanoid", []() {
-        return std::make_unique<Arkanoid>();
+    GameRegistry::instance().registerGame("Arkanoid", [](GameContext& ctx) {
+        return std::make_unique<Arkanoid>(ctx);
     });
 }
 
-Arkanoid::Arkanoid()
-    : screen_(nullptr),
+Arkanoid::Arkanoid(GameContext& ctx)
+    : BaseGame(ctx),
+      screen_(nullptr),
       scoreLabel_(nullptr),
       livesLabel_(nullptr),
-      updateTimer_(nullptr),
       score_(0),
       lives_(3),
       level_(1),
@@ -32,19 +32,20 @@ Arkanoid::Arkanoid()
 }
 
 Arkanoid::~Arkanoid() {
-   // stop();
+    stop();
 }
 
-void Arkanoid::run() {
+void Arkanoid::onStart() {
     ESP_LOGI(TAG, "Starting Arkanoid game");
+    screen_ = screen();
     createGameScreen();
     resetGame();
     gameRunning_ = true;
     
-    updateTimer_ = lv_timer_create(gameUpdateTimerCallback, 33, this);
+    timers().create(33, gameUpdateTimerCallback, this);
 }
 
-void Arkanoid::update() {
+void Arkanoid::onUpdate() {
     if (!gameRunning_) return;
     
     uint32_t currentTime = lv_tick_get();
@@ -90,10 +91,6 @@ void Arkanoid::stop() {
     ESP_LOGI(TAG, "Arkanoid::stop() called");
     gameRunning_ = false;
     
-    if (updateTimer_) {
-        lv_timer_del(updateTimer_);
-        updateTimer_ = nullptr;
-    }
     
     for (auto& brick : bricks_) {
         if (brick.obj) {
@@ -102,13 +99,11 @@ void Arkanoid::stop() {
     }
     bricks_.clear();
     
-    if (screen_) {
-        lv_obj_del(screen_);
-        screen_ = nullptr;
-    }
+    screen_ = nullptr;
+    BaseGame::stop();
 }
 
-void Arkanoid::handleKey(uint32_t key) {
+void Arkanoid::onInput(uint32_t key) {
     if (!gameRunning_) return;
     
     if (key == LV_KEY_LEFT || key == LV_KEY_RIGHT) {
@@ -157,7 +152,7 @@ void Arkanoid::handleKey(uint32_t key) {
 }
 
 void Arkanoid::createGameScreen() {
-    screen_ = createCleanObject(nullptr);
+    screen_ = screen();
     lv_obj_set_style_bg_color(screen_, lv_color_make(0, 0, 0), 0);
     
     //LV_IMAGE_DECLARE(background);
@@ -202,7 +197,6 @@ void Arkanoid::createGameScreen() {
     lv_obj_set_style_bg_color(ball_.obj, lv_color_make(255, 255, 255), 0);
     lv_obj_set_style_radius(ball_.obj, ball_.size / 2, 0);
     
-    lv_scr_load(screen_);
 }
 
 void Arkanoid::resetGame() {
@@ -439,10 +433,6 @@ void Arkanoid::gameOver(bool win) {
 
     lv_obj_center(gameOverLabel);
     
-    if (updateTimer_) {
-        lv_timer_del(updateTimer_);
-        updateTimer_ = nullptr;
-    }
 }
 
 void Arkanoid::gameUpdateTimerCallback(lv_timer_t* timer) {

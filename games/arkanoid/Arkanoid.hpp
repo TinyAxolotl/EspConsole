@@ -1,20 +1,20 @@
 #pragma once
 
-#include "Game.hpp"
+#include "framework/BaseGame.hpp"
 #include "lvgl.h"
 #include <string>
 #include <vector>
 #include <random>
 
-class Arkanoid : public Game {
+class Arkanoid : public BaseGame {
 public:
-    Arkanoid();
+    explicit Arkanoid(GameContext& ctx);
     ~Arkanoid() override;
 
-    void run() override;
-    void update() override;
+    void onStart() override;
+    void onUpdate() override;
+    void onInput(uint32_t key) override;
     void stop() override;
-    void handleKey(uint32_t key) override;
     std::string name() const override { return "Arkanoid"; }
 
 private:
@@ -59,7 +59,6 @@ private:
     lv_obj_t* screen_;
     lv_obj_t* scoreLabel_;
     lv_obj_t* livesLabel_;
-    lv_timer_t* updateTimer_;
     
     Paddle paddle_;
     Ball ball_;

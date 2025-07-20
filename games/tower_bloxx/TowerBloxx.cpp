@@ -13,7 +13,7 @@
 static const char *TAG = "TowerBloxx";
 
 RegisterTowerBloxx::RegisterTowerBloxx() {
-    GameRegistry::instance().registerGame("Tower Bloxx", []() {
+    GameRegistry::instance().registerGame("Tower Bloxx", [](GameContext& ctx) {
         return std::make_unique<TowerBloxx>();
     });
 }

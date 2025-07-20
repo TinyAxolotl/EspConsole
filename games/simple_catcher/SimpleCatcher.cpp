@@ -8,7 +8,7 @@ static const char *TAG = "SimpleCatcher";
 
 RegisterSimpleCatcher::RegisterSimpleCatcher() {
     ESP_LOGI(TAG, "Registering Simple Catcher game");
-    GameRegistry::instance().registerGame("Simple Catcher", []() {
+    GameRegistry::instance().registerGame("Simple Catcher", [](GameContext& ctx) {
         return std::make_unique<SimpleCatcher>();
     });
 }

@@ -11,7 +11,7 @@ static const char *TAG = "Racing";
 
 
 RegisterRacing::RegisterRacing() {
-    GameRegistry::instance().registerGame("Racing", []() {
+    GameRegistry::instance().registerGame("Racing", [](GameContext& ctx) {
         return std::make_unique<Racing>();
     });
 }

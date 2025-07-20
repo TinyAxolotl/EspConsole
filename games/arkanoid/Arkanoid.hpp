@@ -1,6 +1,6 @@
 #pragma once
 
-#include "framework/BaseGame.hpp"
+#include "BaseGame.hpp"
 #include "lvgl.h"
 #include <string>
 #include <vector>

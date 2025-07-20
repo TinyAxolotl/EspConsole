@@ -12,7 +12,7 @@ Game2048::~Game2048() {
 }
 
 Register2048::Register2048() {
-    GameRegistry::instance().registerGame("2048", []() {
+    GameRegistry::instance().registerGame("2048", [](GameContext& ctx) {
         return std::make_unique<Game2048>();
     });
 }

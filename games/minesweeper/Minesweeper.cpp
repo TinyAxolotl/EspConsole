@@ -7,7 +7,7 @@
 #include "lvgl/src/misc/lv_timer.h"
 
 RegisterMinesweeper::RegisterMinesweeper() {
-    GameRegistry::instance().registerGame("Minesweeper", []() {
+    GameRegistry::instance().registerGame("Minesweeper", [](GameContext& ctx) {
         return std::make_unique<Minesweeper>();
     });
 }

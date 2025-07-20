@@ -7,7 +7,7 @@
 #include <cstring>
 
 RegisterSnake::RegisterSnake() {
-    GameRegistry::instance().registerGame("Snake", []() {
+    GameRegistry::instance().registerGame("Snake", [](GameContext& ctx) {
         return std::make_unique<Snake>();
     });
 }

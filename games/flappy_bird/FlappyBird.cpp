@@ -8,7 +8,7 @@
 #include "esp_heap_caps.h"
 
 RegisterFlappyBird::RegisterFlappyBird() {
-    GameRegistry::instance().registerGame("Flappy Bird", []() {
+    GameRegistry::instance().registerGame("Flappy Bird", [](GameContext& ctx) {
         return std::make_unique<FlappyBird>();
     });
 }

@@ -4,9 +4,9 @@
 #include "MenuScreen.hpp"
 #include "Game.hpp"
 #include "InputRouter.hpp"
-#include "framework/GameUI.hpp"
-#include "framework/TimerManager.hpp"
-#include "framework/GameContext.hpp"
+#include "GameUI.hpp"
+#include "TimerManager.hpp"
+#include "GameContext.hpp"
 #include <memory>
 
 class ScreenManager {

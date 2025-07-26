@@ -1,7 +1,6 @@
 //#include "assets/background.c"
 #include "Arkanoid.hpp"
 #include "GameRegistry.hpp"
-#include "lvgl_helper.hpp"
 #include <cstdio>
 #include <cmath>
 #include "esp_log.h"
@@ -162,21 +161,18 @@ void Arkanoid::createGameScreen() {
     //lv_obj_set_pos(backgroundImg_, 0, 0);
     
     scoreLabel_ = lv_label_create(screen_);
-    applyCleanStyle(scoreLabel_);
+    ui().applyCleanStyle(scoreLabel_);
     lv_obj_set_pos(scoreLabel_, 10, 10);
     lv_obj_set_style_text_color(scoreLabel_, lv_color_make(255, 255, 255), 0);
     lv_obj_set_style_text_font(scoreLabel_, &lv_font_montserrat_20, 0);
     
     livesLabel_ = lv_label_create(screen_);
-    applyCleanStyle(livesLabel_);
+    ui().applyCleanStyle(livesLabel_);
     lv_obj_set_pos(livesLabel_, 200, 10);
     lv_obj_set_style_text_color(livesLabel_, lv_color_make(255, 255, 255), 0);
     lv_obj_set_style_text_font(livesLabel_, &lv_font_montserrat_20, 0);
     
-    lv_obj_t* instructionsLabel = lv_label_create(screen_);
-    applyCleanStyle(instructionsLabel);
-    lv_label_set_text(instructionsLabel, "<- -> Move paddle\n^/ENTER Launch ball");
-    lv_obj_align(instructionsLabel, LV_ALIGN_BOTTOM_MID, 0, -5);
+    lv_obj_t* instructionsLabel = ui().createLabel(screen_, "<- -> Move paddle\n^/ENTER Launch ball", LV_ALIGN_BOTTOM_MID, 0, -5);
     lv_obj_set_style_text_color(instructionsLabel, lv_color_make(200, 200, 200), 0);
     lv_obj_set_style_text_align(instructionsLabel, LV_TEXT_ALIGN_CENTER, 0);
     
@@ -185,14 +181,16 @@ void Arkanoid::createGameScreen() {
     paddle_.x = 160 - paddle_.width / 2;
     paddle_.y = 440;
     
-    paddle_.obj = createCleanObject(screen_);
+    paddle_.obj = lv_obj_create(screen_);
+    ui().applyCleanStyle(paddle_.obj);
     lv_obj_set_size(paddle_.obj, paddle_.width, paddle_.height);
     lv_obj_set_pos(paddle_.obj, paddle_.x, paddle_.y);
     lv_obj_set_style_bg_color(paddle_.obj, lv_color_make(255, 255, 255), 0);
     lv_obj_set_style_radius(paddle_.obj, 3, 0);
     
     ball_.size = 8;
-    ball_.obj = createCleanObject(screen_);
+    ball_.obj = lv_obj_create(screen_);
+    ui().applyCleanStyle(ball_.obj);
     lv_obj_set_size(ball_.obj, ball_.size, ball_.size);
     lv_obj_set_style_bg_color(ball_.obj, lv_color_make(255, 255, 255), 0);
     lv_obj_set_style_radius(ball_.obj, ball_.size / 2, 0);
@@ -258,7 +256,8 @@ void Arkanoid::createLevel() {
                 brick.color = lv_color_make(0, 255, 0);
             }
             
-            brick.obj = createCleanObject(screen_);
+            brick.obj = lv_obj_create(screen_);
+            ui().applyCleanStyle(brick.obj);
             lv_obj_set_size(brick.obj, brick.width, brick.height);
             lv_obj_set_pos(brick.obj, brick.x, brick.y);
             lv_obj_set_style_bg_color(brick.obj, brick.color, 0);
@@ -410,14 +409,15 @@ void Arkanoid::updateScore() {
 void Arkanoid::gameOver(bool win) {
     gameRunning_ = false;
     
-    lv_obj_t* overlay = createCleanObject(screen_);
+    lv_obj_t* overlay = lv_obj_create(screen_);
+    ui().applyCleanStyle(overlay);
     lv_obj_set_size(overlay, 320, 480);
     lv_obj_set_pos(overlay, 0, 0);
     lv_obj_set_style_bg_color(overlay, lv_color_make(0, 0, 0), 0);
     lv_obj_set_style_bg_opa(overlay, 128, 0);
     
     lv_obj_t* gameOverLabel = lv_label_create(overlay);
-    applyCleanStyle(gameOverLabel);
+    ui().applyCleanStyle(gameOverLabel);
     lv_obj_set_style_text_font(gameOverLabel, &lv_font_montserrat_24, 0);
     lv_obj_set_style_text_align(gameOverLabel, LV_TEXT_ALIGN_CENTER, 0);
 

@@ -56,7 +56,6 @@ private:
     
     static void gameUpdateTimerCallback(lv_timer_t* timer);
     
-    lv_obj_t* screen_;
     lv_obj_t* scoreLabel_;
     lv_obj_t* livesLabel_;
     
@@ -86,7 +85,6 @@ private:
     std::random_device rd_;
     std::mt19937 gen_;
 
-    lv_obj_t* backgroundImg_;
 };
 
 struct RegisterArkanoid {

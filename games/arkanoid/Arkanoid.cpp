@@ -44,7 +44,7 @@ void Arkanoid::onStart() {
 void Arkanoid::onUpdate() {
     if (!gameRunning_) return;
     
-    uint32_t currentTime = lv_tick_get();
+    uint32_t currentTime = ui().tick();
     
     if (leftPressed_ && (currentTime - lastKeyTime_ > keyTimeout_)) {
         leftPressed_ = false;
@@ -90,7 +90,7 @@ void Arkanoid::stop() {
     
     for (auto& brick : bricks_) {
         if (brick.obj) {
-            lv_obj_del(brick.obj);
+            ui().remove(brick.obj);
         }
     }
     bricks_.clear();
@@ -98,11 +98,12 @@ void Arkanoid::stop() {
     BaseGame::stop();
 }
 
+// BaseGame sets up the input callback and forwards events here
 void Arkanoid::onInput(uint32_t key) {
     if (!gameRunning_) return;
     
     if (key == LV_KEY_LEFT || key == LV_KEY_RIGHT) {
-        lastKeyTime_ = lv_tick_get();
+        lastKeyTime_ = ui().tick();
     }
     
     switch (key) {
@@ -148,42 +149,36 @@ void Arkanoid::onInput(uint32_t key) {
 
 void Arkanoid::createGameScreen() {
     lv_obj_t* scr = screen();
-    lv_obj_set_style_bg_color(scr, lv_color_make(0, 0, 0), 0);
+    ui().setBgColor(scr, ui().color(0, 0, 0));
     
     
     
     scoreLabel_ = ui().createLabel(scr, nullptr);
-    lv_obj_set_pos(scoreLabel_, 10, 10);
-    lv_obj_set_style_text_color(scoreLabel_, lv_color_make(255, 255, 255), 0);
-    lv_obj_set_style_text_font(scoreLabel_, &lv_font_montserrat_20, 0);
+    ui().setPos(scoreLabel_, 10, 10);
+    ui().setTextColor(scoreLabel_, ui().color(255, 255, 255));
+    ui().setTextFont(scoreLabel_, &lv_font_montserrat_20);
 
     livesLabel_ = ui().createLabel(scr, nullptr);
-    lv_obj_set_pos(livesLabel_, 200, 10);
-    lv_obj_set_style_text_color(livesLabel_, lv_color_make(255, 255, 255), 0);
-    lv_obj_set_style_text_font(livesLabel_, &lv_font_montserrat_20, 0);
+    ui().setPos(livesLabel_, 200, 10);
+    ui().setTextColor(livesLabel_, ui().color(255, 255, 255));
+    ui().setTextFont(livesLabel_, &lv_font_montserrat_20);
 
     lv_obj_t* instructionsLabel = ui().createLabel(scr, "<- -> Move paddle\n^/ENTER Launch ball", LV_ALIGN_BOTTOM_MID, 0, -5);
-    lv_obj_set_style_text_color(instructionsLabel, lv_color_make(200, 200, 200), 0);
-    lv_obj_set_style_text_align(instructionsLabel, LV_TEXT_ALIGN_CENTER, 0);
+    ui().setTextColor(instructionsLabel, ui().color(200, 200, 200));
+    ui().setTextAlign(instructionsLabel, LV_TEXT_ALIGN_CENTER);
     
     paddle_.width = 80;
     paddle_.height = 10;
     paddle_.x = 160 - paddle_.width / 2;
     paddle_.y = 440;
     
-    paddle_.obj = lv_obj_create(scr);
-    ui().applyCleanStyle(paddle_.obj);
-    lv_obj_set_size(paddle_.obj, paddle_.width, paddle_.height);
-    lv_obj_set_pos(paddle_.obj, paddle_.x, paddle_.y);
-    lv_obj_set_style_bg_color(paddle_.obj, lv_color_make(255, 255, 255), 0);
-    lv_obj_set_style_radius(paddle_.obj, 3, 0);
+    paddle_.obj = ui().createRect(scr, paddle_.width, paddle_.height, ui().color(255, 255, 255));
+    ui().setPos(paddle_.obj, paddle_.x, paddle_.y);
+    ui().setRadius(paddle_.obj, 3);
     
     ball_.size = 8;
-    ball_.obj = lv_obj_create(scr);
-    ui().applyCleanStyle(ball_.obj);
-    lv_obj_set_size(ball_.obj, ball_.size, ball_.size);
-    lv_obj_set_style_bg_color(ball_.obj, lv_color_make(255, 255, 255), 0);
-    lv_obj_set_style_radius(ball_.obj, ball_.size / 2, 0);
+    ball_.obj = ui().createRect(scr, ball_.size, ball_.size, ui().color(255, 255, 255));
+    ui().setRadius(ball_.obj, ball_.size / 2);
     
 }
 
@@ -201,19 +196,19 @@ void Arkanoid::resetGame() {
     createLevel();
     
     paddle_.x = 160 - paddle_.width / 2;
-    lv_obj_set_x(paddle_.obj, paddle_.x);
+    ui().setX(paddle_.obj, paddle_.x);
     
     ball_.x = paddle_.x + paddle_.width / 2.0f - ball_.size / 2.0f;
     ball_.y = paddle_.y - ball_.size - 2.0f;
     ball_.vx = 0;
     ball_.vy = 0;
-    lv_obj_set_pos(ball_.obj, static_cast<int>(ball_.x), static_cast<int>(ball_.y));
+    ui().setPos(ball_.obj, static_cast<int>(ball_.x), static_cast<int>(ball_.y));
 }
 
 void Arkanoid::createLevel() {
     for (auto& brick : bricks_) {
         if (brick.obj) {
-            lv_obj_del(brick.obj);
+            ui().remove(brick.obj);
         }
     }
     bricks_.clear();
@@ -238,22 +233,18 @@ void Arkanoid::createLevel() {
             
             if (row < 2) {
                 brick.hits = 3;
-                brick.color = lv_color_make(255, 0, 0);
+                brick.color = ui().color(255, 0, 0);
             } else if (row < 4) {
                 brick.hits = 2;
-                brick.color = lv_color_make(255, 165, 0);
+                brick.color = ui().color(255, 165, 0);
             } else {
                 brick.hits = 1;
-                brick.color = lv_color_make(0, 255, 0);
+                brick.color = ui().color(0, 255, 0);
             }
             
-            brick.obj = lv_obj_create(scr);
-            ui().applyCleanStyle(brick.obj);
-            lv_obj_set_size(brick.obj, brick.width, brick.height);
-            lv_obj_set_pos(brick.obj, brick.x, brick.y);
-            lv_obj_set_style_bg_color(brick.obj, brick.color, 0);
-            lv_obj_set_style_border_width(brick.obj, 1, 0);
-            lv_obj_set_style_border_color(brick.obj, lv_color_make(128, 128, 128), 0);
+            brick.obj = ui().createRect(scr, brick.width, brick.height, brick.color);
+            ui().setPos(brick.obj, brick.x, brick.y);
+            ui().setBorder(brick.obj, 1, ui().color(128, 128, 128));
             
             bricks_.push_back(brick);
         }
@@ -266,11 +257,11 @@ void Arkanoid::movePaddle(int dx) {
     if (paddle_.x < 0) paddle_.x = 0;
     if (paddle_.x > 320 - paddle_.width) paddle_.x = 320 - paddle_.width;
     
-    lv_obj_set_x(paddle_.obj, paddle_.x);
+    ui().setX(paddle_.obj, paddle_.x);
     
     if (!ballLaunched_) {
         ball_.x = paddle_.x + paddle_.width / 2.0f - ball_.size / 2.0f;
-        lv_obj_set_x(ball_.obj, static_cast<int>(ball_.x));
+        ui().setX(ball_.obj, static_cast<int>(ball_.x));
     }
 }
 
@@ -304,7 +295,7 @@ void Arkanoid::updateBall() {
         }
     }
     
-    lv_obj_set_pos(ball_.obj, static_cast<int>(ball_.x), static_cast<int>(ball_.y));
+    ui().setPos(ball_.obj, static_cast<int>(ball_.x), static_cast<int>(ball_.y));
 }
 
 void Arkanoid::checkBallCollisions() {
@@ -351,20 +342,20 @@ void Arkanoid::checkBrickCollision(Ball& ball, Brick& brick) {
         
         if (brick.hits <= 0) {
             brick.destroyed = true;
-            lv_obj_del(brick.obj);
+            ui().remove(brick.obj);
             brick.obj = nullptr;
             
             score_ += 10 * level_;
             updateScore();
         } else {
             if (brick.hits == 2) {
-                lv_obj_set_style_bg_color(brick.obj, lv_color_make(255, 165, 0), 0);
+                ui().setBgColor(brick.obj, ui().color(255, 165, 0));
             } else if (brick.hits == 1) {
-                lv_obj_set_style_bg_color(brick.obj, lv_color_make(0, 255, 0), 0);
+                ui().setBgColor(brick.obj, ui().color(0, 255, 0));
             }
         }
         
-        lv_obj_set_pos(ball.obj, static_cast<int>(ball.x), static_cast<int>(ball.y));
+        ui().setPos(ball.obj, static_cast<int>(ball.x), static_cast<int>(ball.y));
     }
 }
 
@@ -390,39 +381,35 @@ void Arkanoid::checkPaddleCollision(Ball& ball) {
 void Arkanoid::updateScore() {
     char scoreText[50];
     snprintf(scoreText, sizeof(scoreText), "Score: %d", score_);
-    lv_label_set_text(scoreLabel_, scoreText);
+    ui().setLabelText(scoreLabel_, scoreText);
     
     char livesText[50];
     snprintf(livesText, sizeof(livesText), "Lives: %d", lives_);
-    lv_label_set_text(livesLabel_, livesText);
+    ui().setLabelText(livesLabel_, livesText);
 }
 
 void Arkanoid::gameOver(bool win) {
     gameRunning_ = false;
     
-    lv_obj_t* overlay = lv_obj_create(screen());
-    ui().applyCleanStyle(overlay);
-    lv_obj_set_size(overlay, 320, 480);
-    lv_obj_set_pos(overlay, 0, 0);
-    lv_obj_set_style_bg_color(overlay, lv_color_make(0, 0, 0), 0);
-    lv_obj_set_style_bg_opa(overlay, 128, 0);
+    lv_obj_t* overlay = ui().createRect(screen(), 320, 480, ui().color(0, 0, 0));
+    ui().setPos(overlay, 0, 0);
+    ui().setBgOpacity(overlay, 128);
     
-    lv_obj_t* gameOverLabel = lv_label_create(overlay);
-    ui().applyCleanStyle(gameOverLabel);
-    lv_obj_set_style_text_font(gameOverLabel, &lv_font_montserrat_24, 0);
-    lv_obj_set_style_text_align(gameOverLabel, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_t* gameOverLabel = ui().createLabel(overlay, nullptr);
+    ui().setTextFont(gameOverLabel, &lv_font_montserrat_24);
+    ui().setTextAlign(gameOverLabel, LV_TEXT_ALIGN_CENTER);
 
     if (win) {
-        lv_label_set_text(gameOverLabel, "YOU WIN!");
-        lv_obj_set_style_text_color(gameOverLabel, lv_color_make(0, 255, 0), 0);
+        ui().setLabelText(gameOverLabel, "YOU WIN!");
+        ui().setTextColor(gameOverLabel, ui().color(0, 255, 0));
     } else {
         char text[50];
         snprintf(text, sizeof(text), "GAME OVER!\nScore: %d", score_);
-        lv_label_set_text(gameOverLabel, text);
-        lv_obj_set_style_text_color(gameOverLabel, lv_color_make(255, 0, 0), 0);
+        ui().setLabelText(gameOverLabel, text);
+        ui().setTextColor(gameOverLabel, ui().color(255, 0, 0));
     }
 
-    lv_obj_center(gameOverLabel);
+    ui().center(gameOverLabel);
     
 }
 

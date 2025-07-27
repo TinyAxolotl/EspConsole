@@ -1,20 +1,22 @@
 #include "FlappyBird.hpp"
 #include "GameRegistry.hpp"
 #include "esp_log.h"
-#include "lvgl_helper.hpp"
 #include "bird.h"
 #include <cstdio>
 #include <cstring>
 #include "esp_heap_caps.h"
 
 RegisterFlappyBird::RegisterFlappyBird() {
-    GameRegistry::instance().registerGame("Flappy Bird", []() {
-        return std::make_unique<FlappyBird>();
+    GameRegistry::instance().registerGame("Flappy Bird", [](GameContext& ctx) {
+        return std::make_unique<FlappyBird>(ctx);
     });
 }
 
-FlappyBird::FlappyBird()
-  : updateTimer_(nullptr),
+FlappyBird::FlappyBird(GameContext& ctx)
+  : BaseGame(ctx),
+    bird_(nullptr),
+    scoreLabel_(nullptr),
+    groundLine_(nullptr),
     pipes_(),
     birdY_(240),
     birdVelocity_(0),
@@ -28,23 +30,21 @@ FlappyBird::FlappyBird()
 
 
 FlappyBird::~FlappyBird() {
-    //stop();
+    stop();
 }
 
 static void* dma_image_buffer = nullptr;
 static lv_image_dsc_t bird_img_ram;
 
-void FlappyBird::run() {
+void FlappyBird::onStart() {
     createGameScreen();
     resetGame();
     gameRunning_ = true;
-    
-    updateTimer_ = lv_timer_create(gameUpdateTimerCallback, 16, this);
 }
 
-void FlappyBird::update() {
+void FlappyBird::onUpdate() {
     if (!gameRunning_ || !gameStarted_) return;
-    
+
     updateBird();
     updatePipes();
     checkCollisions();
@@ -53,30 +53,21 @@ void FlappyBird::update() {
 void FlappyBird::stop() {
     gameRunning_ = false;
     
-    if (updateTimer_) {
-        lv_timer_del(updateTimer_);
-        updateTimer_ = nullptr;
-    }
-    
     for (auto& pipe : pipes_) {
-        if (pipe.topObj) lv_obj_del(pipe.topObj);
-        if (pipe.bottomObj) lv_obj_del(pipe.bottomObj);
+        if (pipe.topObj) ui().remove(pipe.topObj);
+        if (pipe.bottomObj) ui().remove(pipe.bottomObj);
     }
     pipes_.clear();
-
-    if (screen_) {
-        lv_obj_del(screen_);
-        screen_ = nullptr;
-    }
 
     if (dma_image_buffer) {
         heap_caps_free(dma_image_buffer);
         dma_image_buffer = nullptr;
     }
 
+    BaseGame::stop();
 }
 
-void FlappyBird::handleKey(uint32_t key) {
+void FlappyBird::onInput(uint32_t key) {
     if (!gameRunning_) return;
     
     switch (key) {
@@ -91,14 +82,12 @@ void FlappyBird::handleKey(uint32_t key) {
 }
 
 void FlappyBird::createGameScreen() {
-    screen_ = createCleanObject(nullptr);
-    lv_obj_set_style_bg_color(screen_, lv_color_make(0, 102, 255), 0);
-    
-    groundLine_ = createCleanObject(screen_);
-    lv_obj_set_size(groundLine_, 320, 30);
-    lv_obj_set_pos(groundLine_, 0, groundY_);
-    lv_obj_set_style_bg_color(groundLine_, lv_color_make(19, 69, 139), 0);
-    lv_obj_set_style_border_width(groundLine_, 0, 0);
+    lv_obj_t* scr = screen();
+    ui().setBgColor(scr, ui().color(0, 102, 255));
+
+    groundLine_ = ui().createRect(scr, 320, 30, ui().color(19, 69, 139));
+    ui().setPos(groundLine_, 0, groundY_);
+    ui().setBorder(groundLine_, 0, ui().color(0,0,0));
 
 
     /* TODO: Asset too big. So it was splitted on half by DMA.
@@ -114,26 +103,19 @@ void FlappyBird::createGameScreen() {
     bird_img_ram.data_size = bird_img.data_size;
     bird_img_ram.data = (const uint8_t*)dma_image_buffer;
 
-    bird_ = lv_image_create(screen_);
+    bird_ = lv_image_create(scr);
     lv_image_set_src(bird_, &bird_img_ram);
-    lv_obj_set_pos(bird_, 50, birdY_);
-
-    lv_obj_set_pos(bird_, 50, birdY_);
+    ui().setPos(bird_, 50, birdY_);
     
-    scoreLabel_ = lv_label_create(screen_);
-    applyCleanStyle(scoreLabel_);
-    lv_obj_set_pos(scoreLabel_, 10, 10);
-    lv_obj_set_style_text_color(scoreLabel_, lv_color_make(0, 0, 0), 0);
-    lv_obj_set_style_text_font(scoreLabel_, &lv_font_montserrat_26, 0);
+    scoreLabel_ = ui().createLabel(scr, nullptr);
+    ui().setPos(scoreLabel_, 10, 10);
+    ui().setTextColor(scoreLabel_, ui().color(0, 0, 0));
+    ui().setTextFont(scoreLabel_, &lv_font_montserrat_26);
     
-    lv_obj_t* instructionsLabel = lv_label_create(screen_);
-    applyCleanStyle(instructionsLabel);
-    lv_label_set_text(instructionsLabel, "Press UP to flap");
-    lv_obj_align(instructionsLabel, LV_ALIGN_CENTER, 0, 100);
-    lv_obj_set_style_text_color(instructionsLabel, lv_color_make(0, 0, 0), 0);
-    lv_obj_set_style_text_font(instructionsLabel, &lv_font_montserrat_20, 0);
-    
-    lv_scr_load(screen_);
+    lv_obj_t* instructionsLabel = ui().createLabel(scr, "Press UP to flap");
+    ui().align(instructionsLabel, LV_ALIGN_CENTER, 0, 100);
+    ui().setTextColor(instructionsLabel, ui().color(0, 0, 0));
+    ui().setTextFont(instructionsLabel, &lv_font_montserrat_20);
 }
 
 void FlappyBird::resetGame() {
@@ -143,14 +125,14 @@ void FlappyBird::resetGame() {
     gameStarted_ = false;
     
     for (auto& pipe : pipes_) {
-        if (pipe.topObj) lv_obj_del(pipe.topObj);
-        if (pipe.bottomObj) lv_obj_del(pipe.bottomObj);
+        if (pipe.topObj) ui().remove(pipe.topObj);
+        if (pipe.bottomObj) ui().remove(pipe.bottomObj);
     }
     pipes_.clear();
     
     spawnPipe();
     
-    lv_obj_set_pos(bird_, 50, birdY_);
+    ui().setPos(bird_, 50, birdY_);
     updateScore();
 }
 
@@ -174,8 +156,8 @@ void FlappyBird::updatePipes() {
     for (auto& pipe : pipes_) {
         pipe.x -= pipeSpeed_;
         
-        if (pipe.topObj) lv_obj_set_x(pipe.topObj, pipe.x);
-        if (pipe.bottomObj) lv_obj_set_x(pipe.bottomObj, pipe.x);
+        if (pipe.topObj) ui().setX(pipe.topObj, pipe.x);
+        if (pipe.bottomObj) ui().setX(pipe.bottomObj, pipe.x);
 
         if (pipe.topObj) lv_obj_invalidate(pipe.topObj);
         if (pipe.bottomObj) lv_obj_invalidate(pipe.bottomObj);
@@ -188,8 +170,8 @@ void FlappyBird::updatePipes() {
     }
     
     while (!pipes_.empty() && pipes_.front().x < -pipeWidth_) {
-        if (pipes_.front().topObj) lv_obj_del(pipes_.front().topObj);
-        if (pipes_.front().bottomObj) lv_obj_del(pipes_.front().bottomObj);
+        if (pipes_.front().topObj) ui().remove(pipes_.front().topObj);
+        if (pipes_.front().bottomObj) ui().remove(pipes_.front().bottomObj);
         pipes_.erase(pipes_.begin());
     }
     
@@ -205,23 +187,18 @@ void FlappyBird::spawnPipe() {
     pipe.gapSize = pipeGap_;
     pipe.passed = false;
     
-    pipe.topObj = createCleanObject(screen_);
-    lv_obj_set_size(pipe.topObj, pipeWidth_, pipe.gapY - pipe.gapSize / 2);
-    lv_obj_set_pos(pipe.topObj, pipe.x, 0);
-    lv_obj_set_style_bg_color(pipe.topObj, lv_color_make(0, 200, 0), 0);
-    lv_obj_set_style_bg_opa(pipe.topObj, LV_OPA_COVER, 0);
-    lv_obj_set_style_border_width(pipe.topObj, 2, 0);
-    lv_obj_set_style_border_color(pipe.topObj, lv_color_make(0, 150, 0), 0);
+    lv_obj_t* scr = screen();
+    pipe.topObj = ui().createRect(scr, pipeWidth_, pipe.gapY - pipe.gapSize / 2, ui().color(0, 200, 0));
+    ui().setPos(pipe.topObj, pipe.x, 0);
+    ui().setBgOpacity(pipe.topObj, LV_OPA_COVER);
+    ui().setBorder(pipe.topObj, 2, ui().color(0, 150, 0));
 
     int bottomY = pipe.gapY + pipe.gapSize / 2;
     int bottomHeight = groundY_ - bottomY;
-    pipe.bottomObj = createCleanObject(screen_);
-    lv_obj_set_size(pipe.bottomObj, pipeWidth_, bottomHeight);
-    lv_obj_set_pos(pipe.bottomObj, pipe.x, bottomY);
-    lv_obj_set_style_bg_color(pipe.bottomObj, lv_color_make(0, 200, 0), 0);
-    lv_obj_set_style_bg_opa(pipe.bottomObj, LV_OPA_COVER, 0);
-    lv_obj_set_style_border_width(pipe.bottomObj, 2, 0);
-    lv_obj_set_style_border_color(pipe.bottomObj, lv_color_make(0, 150, 0), 0);
+    pipe.bottomObj = ui().createRect(scr, pipeWidth_, bottomHeight, ui().color(0, 200, 0));
+    ui().setPos(pipe.bottomObj, pipe.x, bottomY);
+    ui().setBgOpacity(pipe.bottomObj, LV_OPA_COVER);
+    ui().setBorder(pipe.bottomObj, 2, ui().color(0, 150, 0));
     
     pipes_.push_back(pipe);
 }
@@ -247,38 +224,28 @@ void FlappyBird::checkCollisions() {
 void FlappyBird::updateScore() {
     char scoreText[20];
     snprintf(scoreText, sizeof(scoreText), "%d", score_);
-    lv_label_set_text(scoreLabel_, scoreText);
+    ui().setLabelText(scoreLabel_, scoreText);
 }
 
 void FlappyBird::gameOver() {
     gameRunning_ = false;
-    
-    lv_obj_t* gameOverLabel = lv_label_create(screen_);
-    applyCleanStyle(gameOverLabel);
-    lv_label_set_text(gameOverLabel, "GAME OVER!");
-    lv_obj_set_style_text_font(gameOverLabel, &lv_font_montserrat_24, 0);
-    lv_obj_set_style_text_color(gameOverLabel, lv_color_make(255, 0, 0), 0);
-    lv_obj_center(gameOverLabel);
+
+    lv_obj_t* gameOverLabel = ui().createLabel(screen(), nullptr);
+    ui().setLabelText(gameOverLabel, "GAME OVER!");
+    ui().setTextFont(gameOverLabel, &lv_font_montserrat_24);
+    ui().setTextColor(gameOverLabel, ui().color(255, 0, 0));
+    ui().center(gameOverLabel);
     
     char finalScoreText[50];
     snprintf(finalScoreText, sizeof(finalScoreText), "Score: %d", score_);
-    lv_obj_t* finalScoreLabel = lv_label_create(screen_);
-    applyCleanStyle(finalScoreLabel);
-    lv_label_set_text(finalScoreLabel, finalScoreText);
-    lv_obj_set_style_text_font(finalScoreLabel, &lv_font_montserrat_20, 0);
-    lv_obj_set_style_text_color(finalScoreLabel, lv_color_make(255, 0, 0), 0);
-    lv_obj_align(finalScoreLabel, LV_ALIGN_CENTER, 0, 40);
+    lv_obj_t* finalScoreLabel = ui().createLabel(screen(), finalScoreText);
+    ui().setTextFont(finalScoreLabel, &lv_font_montserrat_20);
+    ui().setTextColor(finalScoreLabel, ui().color(255, 0, 0));
+    ui().align(finalScoreLabel, LV_ALIGN_CENTER, 0, 40);
 }
 
 void FlappyBird::jump() {
     if (gameRunning_) {
         birdVelocity_ = jumpVelocity_;
-    }
-}
-
-void FlappyBird::gameUpdateTimerCallback(lv_timer_t* timer) {
-    FlappyBird* game = static_cast<FlappyBird*>(lv_timer_get_user_data(timer));
-    if (game) {
-        game->update();
     }
 }

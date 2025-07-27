@@ -4,6 +4,9 @@
 #include "MenuScreen.hpp"
 #include "Game.hpp"
 #include "InputRouter.hpp"
+#include "GameUI.hpp"
+#include "TimerManager.hpp"
+#include "GameContext.hpp"
 #include <memory>
 
 class ScreenManager {
@@ -31,6 +34,10 @@ private:
     MenuScreen menuScreen_;
     std::unique_ptr<Game> currentGame_;
     bool initialized_ = false;
+
+    GameUI ui_;
+    TimerManager timers_;
+    GameContext context_{ui_, timers_, *InputRouter::instance()};
     
     // Singleton
     static ScreenManager* instance_;

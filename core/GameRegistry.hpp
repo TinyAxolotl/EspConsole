@@ -5,7 +5,8 @@
 #include <string>
 #include <memory>
 
-using CreateGameFn = std::function<std::unique_ptr<Game>()>;
+class GameContext;
+using CreateGameFn = std::function<std::unique_ptr<Game>(GameContext&)>;
 
 struct GameFactory {
     std::string name;

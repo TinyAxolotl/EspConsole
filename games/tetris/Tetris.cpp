@@ -6,7 +6,7 @@
 #include <cstring>
 
 RegisterTetris::RegisterTetris() {
-    GameRegistry::instance().registerGame("Tetris", []() {
+    GameRegistry::instance().registerGame("Tetris", [](GameContext& ctx) {
         return std::make_unique<Tetris>();
     });
 }

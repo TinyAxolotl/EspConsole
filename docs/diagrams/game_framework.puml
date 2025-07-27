@@ -1,0 +1,34 @@
+@startuml
+!theme plain
+class GameUI {
+  +createScreen()
+  +createLabel(parent, text, align, x, y)
+}
+class TimerManager {
+  +create(period, cb, user_data)
+  +cancel(timer)
+  +clear()
+}
+class GameContext {
+  +ui: GameUI
+  +timers: TimerManager
+  +input: InputRouter
+}
+class BaseGame {
+  -GameContext& ctx
+  -Screen screen
+  +run()
+  +stop()
+  +update()
+  +handleKey(key)
+  --hooks--
+  +onStart()
+  +onUpdate()
+  +onInput(key)
+}
+BaseGame ..> GameContext
+GameContext --> GameUI
+GameContext --> TimerManager
+GameContext --> InputRouter
+BaseGame ..|> Game
+@enduml

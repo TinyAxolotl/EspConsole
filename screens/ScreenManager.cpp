@@ -13,7 +13,8 @@ ScreenManager& ScreenManager::instance() {
     return *instance_;
 }
 
-ScreenManager::ScreenManager() 
+ScreenManager::ScreenManager()
+    : context_(ui_, timers_, *InputRouter::instance())
 {
     menuScreen_.setGameSelectedCallback([this](const GameFactory& gameFactory) {
         switchToGame(gameFactory);
@@ -49,13 +50,14 @@ void ScreenManager::switchToMenu() {
     }
     
     menuScreen_.show();
+    InputRouter::instance()->setCallback([this](uint32_t k){ handleInput(k); });
     state_ = State::MENU;
 }
 
 void ScreenManager::switchToGame(const GameFactory& gameFactory) {
     ESP_LOGI(TAG, "Switching to Game: %s", gameFactory.name.c_str());
     
-    currentGame_ = gameFactory.create();
+    currentGame_ = gameFactory.create(context_);
     
     if (currentGame_) {
         currentGame_->run();

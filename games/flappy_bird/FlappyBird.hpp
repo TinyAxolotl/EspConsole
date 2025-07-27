@@ -1,20 +1,20 @@
 #pragma once
 
-#include "Game.hpp"
+#include "BaseGame.hpp"
 #include "lvgl.h"
 #include <string>
 #include <vector>
 #include <random>
 
-class FlappyBird : public Game {
+class FlappyBird : public BaseGame {
 public:
-    FlappyBird();
+    explicit FlappyBird(GameContext& ctx);
     ~FlappyBird() override;
 
-    void run() override;
-    void update() override;
+    void onStart() override;
+    void onUpdate() override;
+    void onInput(uint32_t key) override;
     void stop() override;
-    void handleKey(uint32_t key) override;
     std::string name() const override { return "Flappy Bird"; }
 
 private:
@@ -36,15 +36,11 @@ private:
     void updateScore();
     void gameOver();
     void jump();
-    
-    static void gameUpdateTimerCallback(lv_timer_t* timer);
-    
-    lv_obj_t* screen_;
+
     lv_obj_t* bird_;
     lv_obj_t* scoreLabel_;
     lv_obj_t* groundLine_;
-    lv_timer_t* updateTimer_;
-    
+
     std::vector<Pipe> pipes_;
     
     float birdY_;
